@@ -10,8 +10,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/semihalev/sdns/logger"
 	"github.com/semihalev/sdns/middleware"
 	"github.com/semihalev/sdns/waitgroup"
+	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 
 	"github.com/miekg/dns"
@@ -133,6 +135,12 @@ func (c *Cache) ServeDNS(ctx context.Context, ch *middleware.Chain) {
 	}
 
 	now := c.now().UTC()
+
+	// 如果为A/AAAA记录，进入区块链cache查询
+	if q.Qtype == dns.TypeA || q.Qtype == dns.TypeAAAA {
+		logger.Get().Infow("cache receive a A/AAAA dns msg", zap.String("qname", q.Name))
+
+	}
 
 	i, found := c.get(cache.Hash(q, req.CheckingDisabled), now)
 	if i != nil && found {

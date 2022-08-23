@@ -11,7 +11,9 @@ require (
 	github.com/semihalev/log v0.1.1
 	github.com/stretchr/testify v1.7.0
 	github.com/yl2chen/cidranger v1.0.2
+	go.uber.org/zap v1.22.0
 	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e
+	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
 
 go 1.13

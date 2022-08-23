@@ -26,6 +26,7 @@ type Server struct {
 	dohAddr        string
 	tlsCertificate string
 	tlsPrivateKey  string
+	fabPath        string
 
 	chainPool sync.Pool
 }
@@ -42,6 +43,7 @@ func New(cfg *config.Config) *Server {
 		dohAddr:        cfg.BindDOH,
 		tlsCertificate: cfg.TLSCertificate,
 		tlsPrivateKey:  cfg.TLSPrivateKey,
+		fabPath:        cfg.CcpPath,
 	}
 
 	server.chainPool.New = func() interface{} {
