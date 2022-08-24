@@ -58,8 +58,6 @@ type Config struct {
 	Plugins map[string]Plugin
 
 	sVersion string
-
-	CcpPath string // fabric连接配置文件
 }
 
 // Plugin type

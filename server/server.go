@@ -43,7 +43,6 @@ func New(cfg *config.Config) *Server {
 		dohAddr:        cfg.BindDOH,
 		tlsCertificate: cfg.TLSCertificate,
 		tlsPrivateKey:  cfg.TLSPrivateKey,
-		fabPath:        cfg.CcpPath,
 	}
 
 	server.chainPool.New = func() interface{} {

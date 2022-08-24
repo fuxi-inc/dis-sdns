@@ -5,11 +5,16 @@ package cache
 
 import (
 	"context"
+	"errors"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
+	fabconfig "github.com/hyperledger/fabric-sdk-go/pkg/core/config"
+	"github.com/hyperledger/fabric-sdk-go/pkg/gateway"
 	"github.com/semihalev/sdns/logger"
 	"github.com/semihalev/sdns/middleware"
 	"github.com/semihalev/sdns/waitgroup"
@@ -54,12 +59,116 @@ type ResponseWriter struct {
 
 var debugns bool
 
+var fabCon = true
+var contract *gateway.Contract
+
+var credPath = filepath.Join(
+	"..",
+	"..",
+	"test-network",
+	"organizations",
+	"peerOrganizations",
+	"org1.example.com",
+	"users",
+	"User1@org1.example.com",
+	"msp",
+)
+
+var ccpPath = filepath.Join(
+	"..",
+	"..",
+	"test-network",
+	"organizations",
+	"peerOrganizations",
+	"org1.example.com",
+	"connection-org1.yaml",
+)
+
 func init() {
 	middleware.Register(name, func(cfg *config.Config) middleware.Handler {
 		return New(cfg)
 	})
 
 	_, debugns = os.LookupEnv("SDNS_DEBUGNS")
+
+	contract = ConnectFab()
+	if contract == nil {
+		logger.Get().Info("cannot connect fabric contract, use traditional cache instead")
+		fabCon = false
+	} else {
+		logger.Get().Info("cache successfully connect to fabric contract")
+	}
+
+}
+
+// 连接Fabric，返回*gateway.Contract
+func ConnectFab() *gateway.Contract {
+	os.Setenv("DISCOVERY_AS_LOCALHOST", "true")
+	wallet, err := gateway.NewFileSystemWallet("wallet")
+	if err != nil {
+		logger.Get().Errorw("failed to create wallet", zap.Error(err))
+		return nil
+	}
+
+	if !wallet.Exists("resUser") {
+		err = populateWallet(wallet)
+		if err != nil {
+			logger.Get().Errorw("failed to populate wallet contents", zap.Error(err))
+			return nil
+		}
+	}
+
+	gw, err := gateway.Connect(
+		gateway.WithConfig(fabconfig.FromFile(filepath.Clean(ccpPath))),
+		gateway.WithIdentity(wallet, "resUser"),
+	)
+	if err != nil {
+		logger.Get().Errorw("failed to connect to gateway", zap.Error(err))
+		return nil
+	}
+
+	network, err := gw.GetNetwork("mychannel")
+	if err != nil {
+		logger.Get().Errorw("failed to get network", zap.Error(err))
+		return nil
+	}
+
+	contract := network.GetContract("RR")
+	return contract
+}
+
+// 创建钱包用户resUser
+func populateWallet(wallet *gateway.Wallet) error {
+
+	certPath := filepath.Join(credPath, "signcerts", "cert.pem")
+	// read the certificate pem
+	cert, err := ioutil.ReadFile(filepath.Clean(certPath))
+	if err != nil {
+		return err
+	}
+
+	keyDir := filepath.Join(credPath, "keystore")
+	// there's a single file in this dir containing the private key
+	files, err := ioutil.ReadDir(keyDir)
+	if err != nil {
+		return err
+	}
+	if len(files) != 1 {
+		return errors.New("keystore folder should have contain one file")
+	}
+	keyPath := filepath.Join(keyDir, files[0].Name())
+	key, err := ioutil.ReadFile(filepath.Clean(keyPath))
+	if err != nil {
+		return err
+	}
+
+	identity := gateway.NewX509Identity("Org1MSP", string(cert), string(key))
+
+	err = wallet.Put("resUser", identity)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // New return cache
@@ -137,8 +246,15 @@ func (c *Cache) ServeDNS(ctx context.Context, ch *middleware.Chain) {
 	now := c.now().UTC()
 
 	// 如果为A/AAAA记录，进入区块链cache查询
-	if q.Qtype == dns.TypeA || q.Qtype == dns.TypeAAAA {
+	if fabCon && q.Qtype == dns.TypeA {
 		logger.Get().Infow("cache receive a A/AAAA dns msg", zap.String("qname", q.Name))
+
+		// 调用queryRR合约查询资源记录
+		result, err := contract.EvaluateTransaction("queryRR", q.Name)
+		if err != nil {
+			logger.Get().Errorw("failed to evaluate transaction", zap.Error(err))
+		}
+		logger.Get().Infow("successfully get the cache result", zap.Binary("result", result))
 
 	}
 
