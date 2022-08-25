@@ -5,10 +5,12 @@ package cache
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -133,7 +135,7 @@ func ConnectFab() *gateway.Contract {
 		return nil
 	}
 
-	contract := network.GetContract("RR")
+	contract := network.GetContract("fabRR")
 	return contract
 }
 
@@ -245,20 +247,36 @@ func (c *Cache) ServeDNS(ctx context.Context, ch *middleware.Chain) {
 
 	now := c.now().UTC()
 
-	// 如果为A/AAAA记录，进入区块链cache查询
+	hashq := cache.Hash(q, req.CheckingDisabled)
+	i := new(item)
+
+	// 标记是否在cache中找到item
+	found := false
+
+	// 如果为A记录，进入区块链cache查询
 	if fabCon && q.Qtype == dns.TypeA {
-		logger.Get().Infow("cache receive a A/AAAA dns msg", zap.String("qname", q.Name))
+		logger.Get().Infow("cache receive a A/AAAA dns msg", zap.String("qname", q.Name), zap.Uint16("qtype", q.Qtype))
 
 		// 调用queryRR合约查询资源记录
-		result, err := contract.EvaluateTransaction("queryRR", q.Name)
-		if err != nil {
+		result, err := contract.EvaluateTransaction("queryRR", strconv.FormatUint(hashq, 10))
+		if err == nil {
+			logger.Get().Infow("successfully get the cache result", zap.Binary("result", result))
+
+			err = json.Unmarshal(result, i)
+			if err != nil {
+				logger.Get().Errorw("failed to unmarshal", zap.Error(err))
+			}
+
+			found = true
+		} else {
+			// fabric cache上未查到
 			logger.Get().Errorw("failed to evaluate transaction", zap.Error(err))
 		}
-		logger.Get().Infow("successfully get the cache result", zap.Binary("result", result))
-
+	} else {
+		// 如果不是A记录（或者未连接fabric合约），还是通过传统cache查询
+		i, found = c.get(hashq, now)
 	}
 
-	i, found := c.get(cache.Hash(q, req.CheckingDisabled), now)
 	if i != nil && found {
 		if !w.Internal() && c.rate > 0 && !i.Limiter.Allow() {
 			//no reply to client
