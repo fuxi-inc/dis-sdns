@@ -24,7 +24,41 @@ func makeRR(data string) dns.RR {
 	return r
 }
 
+// test for query test.com. in Fabric
+func Test_QueryFabric(t *testing.T) {
+	cfg := &config.Config{Expire: 300, CacheSize: 10240, RateLimit: 1}
+	cfg.RootServers = []string{"192.5.5.241:53"}
+	cfg.RootKeys = []string{
+		".			172800	IN	DNSKEY	256 3 8 AwEAAc4qsciJ5MdMUIu4n/pSTsSiU9OCyAanPTe5TcMX4v1hxhpFwiTGQUv3BXT6IAO4litrZKTUaj4vitqHW1+RQsHn3k/gSvt7FwyQwpy0mEnShBgr6RQiGtlBODNY67sTl+W8M/b6SLTAaaDri3BO5u6wrDs149rMELJAdoVBjmXW+zRH3kZzh3lwyTZsYtk7L+3DYbTiiHq+sRB4F9XoBPAz5Psv4q4EiPq07nW3acbW84zTz3CyQUmQkJT9VB1oUKHz6sNoyccqzcMX4q1GHAYpQ7FAXlKMxidoN1Ay5DWANgTmgJXzKhcI2nIZoq1x3yq4814O1LQd9QP68gI37+0=",
+		".			172800	IN	DNSKEY	257 3 8 AwEAAaz/tAm8yTn4Mfeh5eyI96WSVexTBAvkMgJzkKTOiW1vkIbzxeF3+/4RgWOq7HrxRixHlFlExOLAJr5emLvN7SWXgnLh4+B5xQlNVz8Og8kvArMtNROxVQuCaSnIDdD5LKyWbRd2n9WGe2R8PzgCmr3EgVLrjyBxWezF0jLHwVN8efS3rCj/EWgvIWgb9tarpVUDK/b58Da+sqqls3eNbuv7pr+eoZG+SrDK6nWeL3c6H5Apxz7LjVc1uTIdsIXxuOLYA4/ilBmSVIzuDWfdRUfhHdY6+cn8HFRm+2hM8AnXGXws9555KrUB5qihylGa8subX2Nn6UwNR1AkUTV74bU=",
+	}
+
+	c := New(cfg)
+	assert.Equal(t, "cache", c.Name())
+
+	ch := middleware.NewChain([]middleware.Handler{})
+	req := new(dns.Msg)
+	req.SetQuestion("test.com.", dns.TypeA)
+	req.SetEdns0(4096, false)
+
+	mw := mock.NewWriter("udp", "127.0.0.1:0")
+	ch.Reset(mw, req)
+
+	c.ServeDNS(context.Background(), ch)
+	assert.True(t, ch.Writer.Written())
+
+	req.SetQuestion("test2.com.", dns.TypeA)
+	req.SetEdns0(4096, false)
+
+	ch.Reset(mw, req)
+
+	c.ServeDNS(context.Background(), ch)
+	assert.False(t, ch.Writer.Written())
+
+}
+
 func Test_PCache(t *testing.T) {
+
 	cfg := &config.Config{Expire: 300, CacheSize: 10240, RateLimit: 1}
 	cfg.RootServers = []string{"192.5.5.241:53"}
 	cfg.RootKeys = []string{

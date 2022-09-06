@@ -17,10 +17,9 @@ import (
 
 	fabconfig "github.com/hyperledger/fabric-sdk-go/pkg/core/config"
 	"github.com/hyperledger/fabric-sdk-go/pkg/gateway"
-	"github.com/semihalev/sdns/logger"
+	"github.com/semihalev/log"
 	"github.com/semihalev/sdns/middleware"
 	"github.com/semihalev/sdns/waitgroup"
-	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 
 	"github.com/miekg/dns"
@@ -65,8 +64,9 @@ var fabCon = true
 var contract *gateway.Contract
 
 var credPath = filepath.Join(
-	"..",
-	"..",
+	"/home",
+	"fuxi",
+	"fabric-samples",
 	"test-network",
 	"organizations",
 	"peerOrganizations",
@@ -77,8 +77,9 @@ var credPath = filepath.Join(
 )
 
 var ccpPath = filepath.Join(
-	"..",
-	"..",
+	"/home",
+	"fuxi",
+	"fabric-samples",
 	"test-network",
 	"organizations",
 	"peerOrganizations",
@@ -95,10 +96,10 @@ func init() {
 
 	contract = ConnectFab()
 	if contract == nil {
-		logger.Get().Info("cannot connect fabric contract, use traditional cache instead")
+		log.Info("cannot connect fabric contract, use traditional cache instead")
 		fabCon = false
 	} else {
-		logger.Get().Info("cache successfully connect to fabric contract")
+		log.Info("cache successfully connect to fabric contract")
 	}
 
 }
@@ -108,14 +109,14 @@ func ConnectFab() *gateway.Contract {
 	os.Setenv("DISCOVERY_AS_LOCALHOST", "true")
 	wallet, err := gateway.NewFileSystemWallet("wallet")
 	if err != nil {
-		logger.Get().Errorw("failed to create wallet", zap.Error(err))
+		log.Error("failed to create wallet", "error", err.Error())
 		return nil
 	}
 
 	if !wallet.Exists("resUser") {
 		err = populateWallet(wallet)
 		if err != nil {
-			logger.Get().Errorw("failed to populate wallet contents", zap.Error(err))
+			log.Error("failed to populate wallet contents", "error", err.Error())
 			return nil
 		}
 	}
@@ -125,17 +126,17 @@ func ConnectFab() *gateway.Contract {
 		gateway.WithIdentity(wallet, "resUser"),
 	)
 	if err != nil {
-		logger.Get().Errorw("failed to connect to gateway", zap.Error(err))
+		log.Error("failed to connect to gateway", "error", err.Error())
 		return nil
 	}
 
 	network, err := gw.GetNetwork("mychannel")
 	if err != nil {
-		logger.Get().Errorw("failed to get network", zap.Error(err))
+		log.Error("failed to get network", "error", err.Error())
 		return nil
 	}
 
-	contract := network.GetContract("fabRR")
+	contract := network.GetContract("dis_resolver")
 	return contract
 }
 
@@ -250,27 +251,34 @@ func (c *Cache) ServeDNS(ctx context.Context, ch *middleware.Chain) {
 	hashq := cache.Hash(q, req.CheckingDisabled)
 	i := new(item)
 
+	i_new := new(FabricItem)
+
 	// 标记是否在cache中找到item
 	found := false
 
 	// 如果为A记录，进入区块链cache查询
 	if fabCon && q.Qtype == dns.TypeA {
-		logger.Get().Infow("cache receive a A/AAAA dns msg", zap.String("qname", q.Name), zap.Uint16("qtype", q.Qtype))
+		log.Info("cache receive a A dns msg", "qname", q.Name, "qtype", q.Qtype, "hashq", hashq)
 
 		// 调用queryRR合约查询资源记录
 		result, err := contract.EvaluateTransaction("queryRR", strconv.FormatUint(hashq, 10))
 		if err == nil {
-			logger.Get().Infow("successfully get the cache result", zap.Binary("result", result))
 
-			err = json.Unmarshal(result, i)
+			err = json.Unmarshal(result, i_new)
 			if err != nil {
-				logger.Get().Errorw("failed to unmarshal", zap.Error(err))
+				log.Error("failed to unmarshal", "error", err.Error())
 			}
 
+			// log.Info("successfully unmarshal", "fabricItem", i_new)
+
+			i = transItem(i_new)
 			found = true
+
+			log.Info("successfully transform the item", "item", i)
+
 		} else {
 			// fabric cache上未查到
-			logger.Get().Errorw("failed to evaluate transaction", zap.Error(err))
+			log.Info("failed to find the RR from the fabric cache", "error", err.Error())
 		}
 	} else {
 		// 如果不是A记录（或者未连接fabric合约），还是通过传统cache查询

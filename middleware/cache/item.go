@@ -4,11 +4,37 @@
 package cache
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/miekg/dns"
+	"github.com/semihalev/log"
 	"golang.org/x/time/rate"
 )
+
+// RR struct
+type RR struct {
+	Name string `json:"name"`
+	Type uint16 `json:"type"`
+	TTL  uint32 `json:"TTL"`
+	Data string `json:"data"`
+}
+
+// FabricItem descibes basic details of a dns resource record (modify sdns/cache)
+type FabricItem struct {
+	Rcode              int  `json:"rcode"`
+	Authoritative      bool `json:"authoritative"`
+	AuthenticatedData  bool `json:"authenticated"`
+	RecursionAvailable bool `json:"recursion"`
+	Answer             []RR `json:"answer"`
+	Ns                 []RR `json:"ns"`
+	Extra              []RR `json:"extra"`
+
+	Limiter *rate.Limiter `json:"limiter"`
+
+	OrigTTL uint32    `json:"originTTL"`
+	Stored  time.Time `json:"stored"`
+}
 
 type item struct {
 	Rcode              int
@@ -56,6 +82,56 @@ func newItem(m *dns.Msg, now time.Time, d time.Duration, queryRate int) *item {
 	i.Limiter = rate.NewLimiter(limit, queryRate)
 
 	return i
+}
+
+func transItem(i_new *FabricItem) *item {
+	if i_new == nil {
+		return nil
+	}
+
+	i := &item{
+		Rcode:              i_new.Rcode,
+		Authoritative:      i_new.Authoritative,
+		AuthenticatedData:  i_new.AuthenticatedData,
+		RecursionAvailable: i_new.RecursionAvailable,
+		Answer:             make([]dns.RR, len(i_new.Answer)),
+		Ns:                 make([]dns.RR, len(i_new.Ns)),
+		Extra:              make([]dns.RR, len(i_new.Extra)),
+		Limiter:            i_new.Limiter,
+		origTTL:            i_new.OrigTTL,
+		stored:             i_new.Stored,
+	}
+
+	var err error
+	for j, a := range i_new.Answer {
+		i.Answer[j], err = dns.NewRR(a.Name + " " + strconv.FormatUint(uint64(a.TTL), 10) + " " + dns.TypeToString[a.Type] + " " + a.Data)
+		if err != nil {
+			log.Error("failed to create new Answer RR", "rr", a, "error", err.Error())
+		} else {
+			log.Info("successfully create new Answer RR", "rr", i.Answer[j])
+		}
+	}
+
+	for j, a := range i_new.Ns {
+		i.Ns[j], err = dns.NewRR(a.Name + " " + strconv.FormatUint(uint64(a.TTL), 10) + " " + dns.TypeToString[a.Type] + " " + a.Data)
+		if err != nil {
+			log.Error("failed to create new Ns RR", "rr", a, "error", err.Error())
+		} else {
+			log.Info("successfully create new Ns RR", "rr", i.Answer[j])
+		}
+	}
+
+	for j, a := range i_new.Extra {
+		i.Extra[j], err = dns.NewRR(a.Name + " " + strconv.FormatUint(uint64(a.TTL), 10) + " " + dns.TypeToString[a.Type] + " " + a.Data)
+		if err != nil {
+			log.Error("failed to create new Extra RR", "rr", a, "error", err.Error())
+		} else {
+			log.Info("successfully create new Extra RR", "rr", i.Answer[j])
+		}
+	}
+
+	return i
+
 }
 
 // toMsg turns i into a message, it tailors the reply to m.
