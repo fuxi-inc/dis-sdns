@@ -87,7 +87,7 @@ func Setup(cfg *config.Config) {
 		h := handler.new(m.cfg)
 		chainHandlers = append(chainHandlers, h)
 
-		log.Debug("Middleware registered", "name", h.Name(), "index", i)
+		log.Info("Middleware registered", "name", h.Name(), "index", i)
 	}
 
 	setup = true
@@ -148,6 +148,7 @@ func Get(name string) Handler {
 	defer m.mu.RUnlock()
 
 	for i, handler := range m.handlers {
+		log.Info(handler.name)
 		if handler.name == name {
 			if len(chainHandlers) <= i {
 				return nil

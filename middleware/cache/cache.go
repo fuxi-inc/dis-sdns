@@ -422,7 +422,7 @@ func (c *Cache) GetP(key uint64, req *dns.Msg) (*dns.Msg, *rate.Limiter, error) 
 
 // GetN returns negative entry for a key
 func (c *Cache) GetN(key uint64, req *dns.Msg) (*rate.Limiter, error) {
-	if i, ok := c.ncache.Get(key); ok && i.(*item).ttl(c.now()) > 0 {
+	if i, ok := c.ncache.Get(key); ok && i.(*item).ttl(c.now()) > 0 {  
 		it := i.(*item)
 		return it.Limiter, nil
 	}

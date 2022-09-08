@@ -118,8 +118,8 @@ func Test_start(t *testing.T) {
 	run()
 	time.Sleep(2 * time.Second)
 
-	os.Remove(cert)
-	os.Remove(privkey)
+	// os.Remove(cert)
+	// os.Remove(privkey)
 
 	stderr := os.Stderr
 	os.Stderr, _ = os.Open(os.DevNull)

@@ -34,6 +34,21 @@ type Msg struct {
 	Authority []RR `json:",omitempty"`
 }
 
+// 数据地址查询返回
+type DataAddressMsg struct {
+	DataAddress string `json:"dataAddress"`
+}
+
+// 身份公钥查询返回
+type UserKeyMsg struct {
+	UserKey string `json:"userKey"`
+}
+
+// pod地址查询返回
+type PodAddressMsg struct {
+	PodAddress string `json:"podAddress"`
+}
+
 // NewMsg function
 func NewMsg(m *dns.Msg) *Msg {
 	if m == nil {

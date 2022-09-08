@@ -18,12 +18,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/semihalev/log"
 	"github.com/semihalev/sdns/middleware"
 
 	"github.com/miekg/dns"
-	"github.com/semihalev/log"
 	"github.com/semihalev/sdns/config"
 	"github.com/semihalev/sdns/middleware/blocklist"
+	"github.com/semihalev/sdns/middleware/cache"
 	"github.com/semihalev/sdns/mock"
 	"github.com/stretchr/testify/assert"
 )
@@ -141,6 +142,9 @@ func Test_ServerBindFail(t *testing.T) {
 }
 
 func Test_Server(t *testing.T) {
+
+	// log.Info("get msg")
+
 	cfg := &config.Config{}
 	err := generateCertificate()
 	assert.NoError(t, err)
@@ -158,7 +162,10 @@ func Test_Server(t *testing.T) {
 	middleware.Setup(cfg)
 
 	blocklist := middleware.Get("blocklist").(*blocklist.BlockList)
-	blocklist.Set("test.com.")
+	blocklist.Set("test2.com.")
+
+	cache := middleware.Get("cache").(*cache.Cache)
+	cache.Name()
 
 	s := New(cfg)
 	s.Run()
@@ -167,7 +174,10 @@ func Test_Server(t *testing.T) {
 	req.SetQuestion("test.com.", dns.TypeA)
 
 	mw := mock.NewWriter("udp", "127.0.0.1:0")
+
 	s.ServeDNS(mw, req)
+
+	log.Info("get result 1", mw.Msg().String())
 
 	assert.True(t, mw.Written())
 	if assert.NotNil(t, mw.Msg()) {
@@ -182,6 +192,8 @@ func Test_Server(t *testing.T) {
 	s.ServeHTTP(hw, request)
 	assert.Equal(t, 200, hw.Code)
 
+	log.Info("get result 2", hw.Body.String())
+
 	data, err := req.Pack()
 	assert.NoError(t, err)
 
@@ -194,6 +206,8 @@ func Test_Server(t *testing.T) {
 
 	s.ServeHTTP(hw, request)
 	assert.Equal(t, 200, hw.Code)
+
+	log.Info("get result 3", hw.Body.String())
 
 	request, err = http.NewRequest("GET", "/dns-query?name=example.com", nil)
 	assert.NoError(t, err)

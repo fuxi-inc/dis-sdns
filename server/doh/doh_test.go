@@ -8,9 +8,11 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/miekg/dns"
+	"github.com/semihalev/log"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -30,6 +32,100 @@ func handleTest(w http.ResponseWriter, r *http.Request) {
 
 	handleFn(w, r)
 }
+
+func handleDISTest(w http.ResponseWriter, r *http.Request) {
+	handle := func(req *dns.Msg) *dns.Msg {
+		msg, _ := dns.Exchange(req, "192.168.10.222:5301")
+
+		return msg
+	}
+
+	var handleFn func(http.ResponseWriter, *http.Request)
+
+	log.Info("URL Path", r.URL.Path)
+	if strings.Contains(r.URL.Path, "dis-query") {
+		handleFn = HandleDIS(handle)
+	} else if r.Method == http.MethodGet && r.URL.Query().Get("dns") == "" {
+		handleFn = HandleJSON(handle)
+	} else {
+		handleFn = HandleWireFormat(handle)
+	}
+
+	handleFn(w, r)
+}
+
+func Test_disQuery(t *testing.T) {
+	t.Parallel()
+
+	w := httptest.NewRecorder()
+
+	// 测试数据地址查询
+	request, err := http.NewRequest("GET", "/dis-query/dataAddress?dataid=09faf1a7-963a-4799-a476-99804588835f.data.fuxi.", nil)
+	assert.NoError(t, err)
+
+	request.RemoteAddr = "127.0.0.1:0"
+
+	handleDISTest(w, request)
+
+	assert.Equal(t, w.Code, http.StatusOK)
+
+	data, err := ioutil.ReadAll(w.Body)
+	assert.NoError(t, err)
+
+	log.Info("data", string(data))
+	var dm DataAddressMsg
+	err = json.Unmarshal(data, &dm)
+	assert.NoError(t, err)
+
+	log.Info("DataAddress", dm.DataAddress)
+	assert.Equal(t, len(dm.DataAddress) > 0, true)
+
+	// 测试身份公钥查询
+	request, err = http.NewRequest("GET", "/dis-query/userkey?userid=weijiuqi.user.fuxi.", nil)
+	assert.NoError(t, err)
+
+	request.RemoteAddr = "127.0.0.1:0"
+
+	handleDISTest(w, request)
+
+	assert.Equal(t, w.Code, http.StatusOK)
+
+	data, err = ioutil.ReadAll(w.Body)
+	assert.NoError(t, err)
+
+	log.Info("data", string(data))
+
+	var uk UserKeyMsg
+	err = json.Unmarshal(data, &uk)
+	assert.NoError(t, err)
+
+	log.Info("UserKey", uk.UserKey)
+	assert.Equal(t, len(uk.UserKey) > 0, true)
+
+	// 测试POD地址查询
+	request, err = http.NewRequest("GET", "/dis-query/podAddress?userid=weijiuqi.user.fuxi", nil)
+	assert.NoError(t, err)
+
+	request.RemoteAddr = "127.0.0.1:0"
+
+	handleDISTest(w, request)
+
+	assert.Equal(t, w.Code, http.StatusOK)
+
+	data, err = ioutil.ReadAll(w.Body)
+	assert.NoError(t, err)
+
+	log.Info("data", string(data))
+
+	var pa PodAddressMsg
+	err = json.Unmarshal(data, &pa)
+	assert.NoError(t, err)
+
+	log.Info("PodAddress", pa.PodAddress)
+	assert.Equal(t, len(pa.PodAddress) > 0, true)
+
+}
+
 func Test_dohJSON(t *testing.T) {
 	t.Parallel()
 
@@ -52,6 +148,7 @@ func Test_dohJSON(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, len(dm.Answer) > 0, true)
+
 }
 
 func Test_dohJSONerror(t *testing.T) {

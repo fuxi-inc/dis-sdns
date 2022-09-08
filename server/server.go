@@ -26,7 +26,6 @@ type Server struct {
 	dohAddr        string
 	tlsCertificate string
 	tlsPrivateKey  string
-	fabPath        string
 
 	chainPool sync.Pool
 }
@@ -76,7 +75,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var handlerFn func(http.ResponseWriter, *http.Request)
-	if r.Method == http.MethodGet && r.URL.Query().Get("dns") == "" {
+
+	log.Info("URL Path", r.URL.Path)
+	if strings.Contains(r.URL.Path, "dis-query") {
+		handlerFn = doh.HandleDIS(handle)
+	} else if r.Method == http.MethodGet && r.URL.Query().Get("dns") == "" {
 		handlerFn = doh.HandleJSON(handle)
 	} else {
 		handlerFn = doh.HandleWireFormat(handle)

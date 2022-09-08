@@ -47,6 +47,8 @@ func Test_QueryFabric(t *testing.T) {
 	c.ServeDNS(context.Background(), ch)
 	assert.True(t, ch.Writer.Written())
 
+	// log.Info("msg", ch.Writer.Msg().String())
+
 	req.SetQuestion("test2.com.", dns.TypeA)
 	req.SetEdns0(4096, false)
 
@@ -55,10 +57,11 @@ func Test_QueryFabric(t *testing.T) {
 	c.ServeDNS(context.Background(), ch)
 	assert.False(t, ch.Writer.Written())
 
+	// log.Info("msg", ch.Writer.Msg().String())
+
 }
 
 func Test_PCache(t *testing.T) {
-
 	cfg := &config.Config{Expire: 300, CacheSize: 10240, RateLimit: 1}
 	cfg.RootServers = []string{"192.5.5.241:53"}
 	cfg.RootKeys = []string{

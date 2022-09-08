@@ -1,7 +1,6 @@
 package config
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,7 +15,7 @@ func Test_config(t *testing.T) {
 	_, err = Load(configFile, "0.0.0")
 	assert.NoError(t, err)
 
-	os.Remove(configFile)
+	// os.Remove(configFile)
 }
 
 func Test_configError(t *testing.T) {
