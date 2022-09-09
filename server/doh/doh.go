@@ -87,7 +87,7 @@ func HandleJSON(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *http.
 
 		req := new(dns.Msg)
 		req.SetQuestion(name, qtype)
-		req.AuthenticatedData = true
+		// req.AuthenticatedData = true
 
 		if r.URL.Query().Get("cd") == "true" {
 			req.CheckingDisabled = true
@@ -180,7 +180,7 @@ func HandleDIS(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *http.R
 
 			req := new(dns.Msg)
 			req.SetQuestion(dataid, qtype)
-			req.AuthenticatedData = true
+			// req.AuthenticatedData = true
 
 			log.Info("request", req.Question[0].String())
 
@@ -206,8 +206,10 @@ func HandleDIS(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *http.R
 				return
 			}
 
+			tmp = strings.Trim(slice[2], "\"")
+
 			dataAddress := &DataAddressMsg{
-				DataAddress: slice[2],
+				DataAddress: tmp,
 			}
 
 			json, err := json.Marshal(dataAddress)
@@ -314,8 +316,10 @@ func HandleDIS(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *http.R
 				return
 			}
 
+			tmp = strings.Trim(slice[2], "\"")
+
 			podAddress := &PodAddressMsg{
-				PodAddress: slice[2],
+				PodAddress: tmp,
 			}
 
 			json, err := json.Marshal(podAddress)

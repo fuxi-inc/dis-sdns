@@ -148,7 +148,7 @@ func Get(name string) Handler {
 	defer m.mu.RUnlock()
 
 	for i, handler := range m.handlers {
-		log.Info(handler.name)
+		log.Info("get handler", handler.name)
 		if handler.name == name {
 			if len(chainHandlers) <= i {
 				return nil

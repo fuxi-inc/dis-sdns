@@ -76,7 +76,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	var handlerFn func(http.ResponseWriter, *http.Request)
 
-	log.Info("URL Path", r.URL.Path)
+	log.Warn("URL Path", r.URL.Path)
 	if strings.Contains(r.URL.Path, "dis-query") {
 		handlerFn = doh.HandleDIS(handle)
 	} else if r.Method == http.MethodGet && r.URL.Query().Get("dns") == "" {
@@ -93,7 +93,7 @@ func (s *Server) Run() {
 	go s.ListenAndServeDNS("udp")
 	go s.ListenAndServeDNS("tcp")
 	go s.ListenAndServeDNSTLS()
-	go s.ListenAndServeHTTPTLS()
+	go s.ListenAndServeHTTP()
 }
 
 // ListenAndServeDNS Starts a server on address and network specified Invoke handler
@@ -128,12 +128,12 @@ func (s *Server) ListenAndServeDNSTLS() {
 }
 
 // ListenAndServeHTTPTLS acts like http.ListenAndServeTLS
-func (s *Server) ListenAndServeHTTPTLS() {
+func (s *Server) ListenAndServeHTTP() {
 	if s.dohAddr == "" {
 		return
 	}
 
-	log.Info("DNS server listening...", "net", "https", "addr", s.dohAddr)
+	log.Info("DNS server listening...", "net", "http", "addr", s.dohAddr)
 
 	logReader, logWriter := io.Pipe()
 	go readlogs(logReader)
@@ -146,8 +146,8 @@ func (s *Server) ListenAndServeHTTPTLS() {
 		ErrorLog:     l.New(logWriter, "", 0),
 	}
 
-	if err := srv.ListenAndServeTLS(s.tlsCertificate, s.tlsPrivateKey); err != nil {
-		log.Error("DNSs listener failed", "net", "https", "addr", s.dohAddr, "error", err.Error())
+	if err := srv.ListenAndServe(); err != nil {
+		log.Error("DNSs listener failed", "net", "http", "addr", s.dohAddr, "error", err.Error())
 	}
 }
 

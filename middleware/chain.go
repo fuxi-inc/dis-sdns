@@ -2,8 +2,10 @@ package middleware
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/miekg/dns"
+	"github.com/semihalev/log"
 )
 
 // Chain type
@@ -20,6 +22,7 @@ type Chain struct {
 
 // NewChain return new fresh chain
 func NewChain(handlers []Handler) *Chain {
+	log.Info("len of handlers", strconv.Itoa(len(handlers)))
 	return &Chain{
 		Writer:   &responseWriter{},
 		handlers: handlers,

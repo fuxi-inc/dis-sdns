@@ -49,12 +49,24 @@ func (h *DNSHandler) Name() string { return name }
 
 // ServeDNS implements the Handle interface.
 func (h *DNSHandler) ServeDNS(ctx context.Context, ch *middleware.Chain) {
-	if len(h.cfg.ForwarderServers) > 0 {
+
+	// if len(h.cfg.ForwarderServers) > 0 {
+	// 	ch.Next(ctx)
+	// 	return
+	// }
+
+	w, req := ch.Writer, ch.Request
+
+	q := req.Question[0]
+
+	name := dns.Fqdn(q.Name)
+	split := dns.SplitDomainName(name)
+
+	// 检索fuxi域，直接通过forwarder
+	if len(split) > 0 && split[len(split)-1] == "fuxi" {
 		ch.Next(ctx)
 		return
 	}
-
-	w, req := ch.Writer, ch.Request
 
 	if v := ctx.Value(ctxKey("reqid")); v == nil {
 		ctx = context.WithValue(ctx, ctxKey("reqid"), req.Id)
