@@ -159,8 +159,8 @@ func HandleJSON(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *http.
 	}
 }
 
-// HandleDIS handle dis request
-func HandleDIS(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *http.Request) {
+// HandleDIS handle dis query request
+func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 
@@ -181,8 +181,6 @@ func HandleDIS(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *http.R
 			req := new(dns.Msg)
 			req.SetQuestion(dataid, qtype)
 			// req.AuthenticatedData = true
-
-			log.Info("request", req.Question[0].String())
 
 			msg := handle(req)
 			if msg == nil {
@@ -238,7 +236,7 @@ func HandleDIS(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *http.R
 
 			req := new(dns.Msg)
 			req.SetQuestion(userid, qtype)
-			req.AuthenticatedData = true
+			// req.AuthenticatedData = true
 
 			msg := handle(req)
 			if msg == nil {
@@ -292,7 +290,7 @@ func HandleDIS(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *http.R
 
 			req := new(dns.Msg)
 			req.SetQuestion(userid, qtype)
-			req.AuthenticatedData = true
+			// req.AuthenticatedData = true
 
 			msg := handle(req)
 			if msg == nil {
@@ -312,7 +310,7 @@ func HandleDIS(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *http.R
 			slice := strings.Split(tmp, " ")
 			if len(slice) != 3 {
 				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
-				log.Info("failed to split the dpodAddress from the answer RR", "answer", tmp)
+				log.Info("failed to split the podAddress from the answer RR", "answer", tmp)
 				return
 			}
 
@@ -333,6 +331,160 @@ func HandleDIS(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *http.R
 
 			_, _ = w.Write(json)
 
+		} else if strings.Contains(path, "owner") {
+			dataid := r.URL.Query().Get("dataid")
+			if dataid == "" {
+				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				log.Info("failed to get dataid", "url", r.URL.String())
+				return
+			}
+			dataid = dns.Fqdn(dataid)
+
+			log.Info("receive query data address", "dataid", dataid)
+
+			qtype := dns.TypeRP
+
+			req := new(dns.Msg)
+			req.SetQuestion(dataid, qtype)
+
+			msg := handle(req)
+			if msg == nil {
+				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				log.Info("failed to handle the request", "req", req)
+				return
+			}
+
+			if len(msg.Answer) == 0 {
+				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				log.Info("failed to find the ownerID", "dataid", dataid)
+				return
+			}
+			a := msg.Answer[0]
+
+			tmp := strings.TrimPrefix(a.String(), a.Header().String())
+			slice := strings.Split(tmp, " ")
+			if len(slice) != 2 {
+				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				log.Info("failed to split the ownerID from the answer RR", "answer", tmp)
+				return
+			}
+
+			tmp = strings.Trim(slice[0], "\"")
+
+			owner := &OwnerMsg{
+				OwnerID: tmp,
+			}
+
+			json, err := json.Marshal(owner)
+			if err != nil {
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				return
+			}
+
+			w.Header().Set("Server", "SDNS")
+			w.Header().Set("Content-Type", "application/dns-json")
+
+			_, _ = w.Write(json)
+
+		} else {
+			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+			return
+		}
+
+	}
+}
+
+// HandleDIS handle dis auth request
+func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+
+		// 授权验证
+		if strings.Contains(path, "authorization") {
+			var params AuthorizationParams
+
+			if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				log.Info("failed to decode request body", "err", err.Error())
+				return
+			}
+
+			id := params.Identifier
+			rec := params.Recipient
+
+			if id == "" || rec == "" {
+				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				paramsJson, _ := json.Marshal(params)
+				log.Info("failed to get one of the params", "params", string(paramsJson))
+				return
+			}
+
+			// 从header中获取pod签名
+			sign := r.Header.Get("Authorization")
+			if sign == "" {
+				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				log.Info("failed to get the pod signature", "sign", sign)
+				return
+			}
+
+			args := strings.Split(sign, " ")
+			if len(args) != 3 {
+				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				log.Info("failed to get the pod signature", "sign", sign)
+				return
+			}
+
+			// 截取pod签名
+			podSignature, err := base64.StdEncoding.DecodeString(args[1])
+			if podSignature == nil || err != nil {
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				log.Info("failed to decode signature", "err", err.Error())
+				return
+			}
+
+			// 截取访问者签名
+			accSignature, err := base64.StdEncoding.DecodeString(args[2])
+			if accSignature == nil || err != nil {
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				log.Info("failed to decode signature", "err", err.Error())
+				return
+			}
+
+			// 获取访问者公钥
+			pK, err := getPublicKey(id)
+			if err != nil {
+				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				log.Info("failed to find the userkey", "userid", id, "error", err)
+				return
+			}
+
+			publicKey, err := importPublicKey(pK)
+			if err != nil {
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				log.Info("failed to transfer to rsa.Publickey", "err", err.Error())
+				return
+			}
+
+			requestAsBytes, err := json.Marshal(params)
+			if err != nil {
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				log.Info("failed to marshal", "err", err.Error())
+				return
+			}
+
+			// 验证访问者签名
+			err = verifySignature(publicKey, hash(requestAsBytes), accSignature)
+			if err != nil {
+				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+				log.Info("failed to verify the pod signature", "err", err.Error())
+				return
+			}
+
+			// 获取数据标识对应身份（pod）标识
+
+		} else {
+			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+			return
 		}
 
 	}

@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/miekg/dns"
@@ -25,27 +24,6 @@ func handleTest(w http.ResponseWriter, r *http.Request) {
 
 	var handleFn func(http.ResponseWriter, *http.Request)
 	if r.Method == http.MethodGet && r.URL.Query().Get("dns") == "" {
-		handleFn = HandleJSON(handle)
-	} else {
-		handleFn = HandleWireFormat(handle)
-	}
-
-	handleFn(w, r)
-}
-
-func handleDISTest(w http.ResponseWriter, r *http.Request) {
-	handle := func(req *dns.Msg) *dns.Msg {
-		msg, _ := dns.Exchange(req, "192.168.10.222:5301")
-
-		return msg
-	}
-
-	var handleFn func(http.ResponseWriter, *http.Request)
-
-	log.Info("URL Path", r.URL.Path)
-	if strings.Contains(r.URL.Path, "dis-query") {
-		handleFn = HandleDIS(handle)
-	} else if r.Method == http.MethodGet && r.URL.Query().Get("dns") == "" {
 		handleFn = HandleJSON(handle)
 	} else {
 		handleFn = HandleWireFormat(handle)
@@ -123,6 +101,28 @@ func Test_disQuery(t *testing.T) {
 
 	log.Info("PodAddress", pa.PodAddress)
 	assert.Equal(t, len(pa.PodAddress) > 0, true)
+
+	// 测试所有者标识（RP）
+	request, err = http.NewRequest("GET", "/dis-query/owner?dataid=09faf1a7-963a-4799-a476-99804588835f.data.fuxi.", nil)
+	assert.NoError(t, err)
+
+	request.RemoteAddr = "127.0.0.1:0"
+
+	handleDISTest(w, request)
+
+	assert.Equal(t, w.Code, http.StatusOK)
+
+	data, err = ioutil.ReadAll(w.Body)
+	assert.NoError(t, err)
+
+	log.Info("data", string(data))
+
+	var ow OwnerMsg
+	err = json.Unmarshal(data, &ow)
+	assert.NoError(t, err)
+
+	log.Info("OwnerID", ow.OwnerID)
+	assert.Equal(t, len(ow.OwnerID) > 0, true)
 
 }
 

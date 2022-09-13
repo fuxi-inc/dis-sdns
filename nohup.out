@@ -1,0 +1,37 @@
+ [fabsdk/core] 2022/09/13 07:27:44 UTC - cryptosuite.GetDefault -> INFO No default cryptosuite found, using default SW implementation
+t=2022-09-13T15:27:44+0800 lvl=info msg="cache successfully connect to fabric contract"
+t=2022-09-13T15:27:44+0800 lvl=info msg="Starting sdns..." version=1.2.1
+t=2022-09-13T15:27:44+0800 lvl=info msg="Loading config file" path=sdns.conf
+t=2022-09-13T15:27:44+0800 lvl=info msg="Middleware registered" name=recovery index=0
+t=2022-09-13T15:27:44+0800 lvl=info msg="Middleware registered" name=metrics index=1
+t=2022-09-13T15:27:44+0800 lvl=info msg="Middleware registered" name=accesslist index=2
+t=2022-09-13T15:27:44+0800 lvl=info msg="Middleware registered" name=ratelimit index=3
+t=2022-09-13T15:27:44+0800 lvl=info msg="Middleware registered" name=edns index=4
+t=2022-09-13T15:27:44+0800 lvl=info msg="Middleware registered" name=accesslog index=5
+t=2022-09-13T15:27:44+0800 lvl=info msg="Middleware registered" name=chaos index=6
+t=2022-09-13T15:27:44+0800 lvl=info msg="Middleware registered" name=hostsfile index=7
+t=2022-09-13T15:27:44+0800 lvl=info msg="Middleware registered" name=blocklist index=8
+t=2022-09-13T15:27:44+0800 lvl=info msg="Empty zones loaded" zones=99
+t=2022-09-13T15:27:44+0800 lvl=info msg="Middleware registered" name=as112 index=9
+t=2022-09-13T15:27:44+0800 lvl=info msg="Middleware registered" name=cache index=10
+t=2022-09-13T15:27:44+0800 lvl=info msg="Middleware registered" name=failover index=11
+t=2022-09-13T15:27:44+0800 lvl=info msg="Middleware registered" name=resolver index=12
+t=2022-09-13T15:27:44+0800 lvl=info msg="Middleware registered" name=forwarder index=13
+t=2022-09-13T15:27:44+0800 lvl=info msg="get handler" recovery=nil LOG_ERROR="Normalized odd number of arguments by adding nil"
+t=2022-09-13T15:27:44+0800 lvl=info msg="get handler" metrics=nil LOG_ERROR="Normalized odd number of arguments by adding nil"
+t=2022-09-13T15:27:44+0800 lvl=info msg="get handler" accesslist=nil LOG_ERROR="Normalized odd number of arguments by adding nil"
+t=2022-09-13T15:27:44+0800 lvl=info msg="get handler" ratelimit=nil LOG_ERROR="Normalized odd number of arguments by adding nil"
+t=2022-09-13T15:27:44+0800 lvl=info msg="get handler" edns=nil LOG_ERROR="Normalized odd number of arguments by adding nil"
+t=2022-09-13T15:27:44+0800 lvl=info msg="get handler" accesslog=nil LOG_ERROR="Normalized odd number of arguments by adding nil"
+t=2022-09-13T15:27:44+0800 lvl=info msg="get handler" chaos=nil LOG_ERROR="Normalized odd number of arguments by adding nil"
+t=2022-09-13T15:27:44+0800 lvl=info msg="DNS server listening..." net=udp addr=:53
+t=2022-09-13T15:27:44+0800 lvl=info msg="DNS server listening..." net=tcp-tls addr=:853
+t=2022-09-13T15:27:44+0800 lvl=info msg="get handler" hostsfile=nil LOG_ERROR="Normalized odd number of arguments by adding nil"
+t=2022-09-13T15:27:44+0800 lvl=info msg="get handler" blocklist=nil LOG_ERROR="Normalized odd number of arguments by adding nil"
+t=2022-09-13T15:27:44+0800 lvl=info msg="DNS server listening..." net=tcp addr=:53
+t=2022-09-13T15:27:44+0800 lvl=info msg="DNS server listening..." net=http addr=:8053
+t=2022-09-13T15:27:44+0800 lvl=info msg="API server listening..." addr=127.0.0.1:8080
+t=2022-09-13T15:27:44+0800 lvl=info msg="len of handlers" 14=nil LOG_ERROR="Normalized odd number of arguments by adding nil"
+t=2022-09-13T15:27:45+0800 lvl=info msg="Loading blocked domains" path=bl
+t=2022-09-13T15:27:45+0800 lvl=info msg="Blocked domains loaded" total=0
+t=2022-09-13T15:27:50+0800 lvl=info msg="Stopping sdns..."

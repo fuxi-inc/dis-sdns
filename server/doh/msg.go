@@ -49,6 +49,17 @@ type PodAddressMsg struct {
 	PodAddress string `json:"podAddress"`
 }
 
+// 数据所有者查询返回
+type OwnerMsg struct {
+	OwnerID string `json:"ownerID"`
+}
+
+// 授权验证查询请求
+type AuthorizationParams struct {
+	Identifier string `json:"dataID"`
+	Recipient  string `json:"viewUserID"`
+}
+
 // NewMsg function
 func NewMsg(m *dns.Msg) *Msg {
 	if m == nil {
