@@ -109,7 +109,7 @@ func Test_disQuery(t *testing.T) {
 	// 测试所有者标识（RP）
 	w = httptest.NewRecorder()
 
-	request, err = http.NewRequest("GET", "/dis-query/owner?dataid=09faf1a7-963a-4799-a476-99804588835f.data.fuxi.", nil)
+	request, err = http.NewRequest("GET", "/dis-query/owner?dataid=7a18f1b2-8664-4867-8034-18625e0b760d.data.fuxi.", nil)
 	assert.NoError(t, err)
 
 	request.RemoteAddr = "127.0.0.1:0"
@@ -133,7 +133,7 @@ func Test_disQuery(t *testing.T) {
 	// 测试数据完整性记录（TXT）查询
 	w = httptest.NewRecorder()
 
-	request, err = http.NewRequest("GET", "/dis-query/auth?dataid=21ba902b-42d3-4633-9d92-ce5a709c478f.data.fuxi.", nil)
+	request, err = http.NewRequest("GET", "/dis-query/auth?dataid=7a18f1b2-8664-4867-8034-18625e0b760d.data.fuxi.", nil)
 	assert.NoError(t, err)
 
 	request.RemoteAddr = "127.0.0.1:0"
@@ -154,70 +154,58 @@ func Test_disQuery(t *testing.T) {
 	log.Info("AuthTXT", au.Auth)
 	assert.Equal(t, len(au.Auth) > 0, true)
 
-	// 授权验证
-	// w = httptest.NewRecorder()
-
-	// request, err = http.NewRequest("POST", "/dis-auth/authorization?dataid=AWI346YBNIHHNLUB5FWUXJLIYM7TXYNOFHHU77FSEGERQZQ3W5CA====.b0494c9d-b624-4897-ab11-7450fa53b718.data.fuxi.", nil)
-	// assert.NoError(t, err)
-
-	// request.RemoteAddr = "127.0.0.1:0"
-
-	// handleDISTest(w, request)
-
-	// assert.Equal(t, w.Code, http.StatusOK)
-
-	// data, err = ioutil.ReadAll(w.Body)
-	// assert.NoError(t, err)
-
-	// log.Info("data", string(data))
-
-	// var autho AuthMsg
-	// err = json.Unmarshal(data, &autho)
-	// assert.NoError(t, err)
-
-	// log.Info("AuthTXT", au.Auth)
-	// assert.Equal(t, len(au.Auth) > 0, true)
 }
 
 func Test_disAuth(t *testing.T) {
 	t.Parallel()
 
-	// // 授权验证
-	// w := httptest.NewRecorder()
+	// 授权验证
+	w := httptest.NewRecorder()
 
-	// pa := &AuthorizationParams{
-	// 	Identifier: "",
-	// 	Recipient:  "b0494c9d-b624-4897-ab11-7450fa53b718.data.fuxi",
-	// }
+	userid := "userb.user.fuxi"
+	dataid := "7a18f1b2-8664-4867-8034-18625e0b760d.data.fuxi"
 
-	// requestAsBytes, err := json.Marshal(request)
-	// assert.NoError(t, err)
+	cred, err := loadUserCredentials("../../test/userb.yaml")
+	assert.NoError(t, err)
 
-	// // TODO 获取私钥
+	accPrivKey, _, err := fetchKeyPair(cred)
+	assert.NoError(t, err)
 
-	// podSignature, err := sign(podPK, hash(requestAsBytes))
-	// accSignature, err := sign(accPK, hash(requestAsBytes))
+	cred, err = loadUserCredentials("../../test/usera.yaml")
+	assert.NoError(t, err)
 
-	// request, err := http.NewRequest("GET", "/dis-auth/authorization?userid=weijiuqi.user.fuxi.&dataid=09faf1a7-963a-4799-a476-99804588835f.data.fuxi.")
-	// assert.NoError(t, err)
+	podPrivKey, _, err := fetchKeyPair(cred)
+	assert.NoError(t, err)
 
-	// request.RemoteAddr = "127.0.0.1:0"
-	// request.Header.Set("Authorization", "Bearer "+base64.StdEncoding.EncodeToString(podSignature)+" "+base64.StdEncoding.EncodeToString(accSignature))
+	podSignature, err := sign(podPrivKey, hash([]byte(dataid+userid)))
+	assert.NoError(t, err)
 
-	// handleDISTest(w, request)
+	accSignature, err := sign(accPrivKey, hash([]byte(dataid+userid)))
+	assert.NoError(t, err)
 
-	// assert.Equal(t, w.Code, http.StatusOK)
+	log.Info("accSignature", base64.StdEncoding.EncodeToString(accSignature))
+	log.Info("podSignature", base64.StdEncoding.EncodeToString(podSignature))
 
-	// data, err := ioutil.ReadAll(w.Body)
-	// assert.NoError(t, err)
+	request, err := http.NewRequest("GET", "/dis-auth/authorization?userid=userb.user.fuxi&dataid=7a18f1b2-8664-4867-8034-18625e0b760d.data.fuxi", nil)
+	assert.NoError(t, err)
 
-	// log.Info("data", string(data))
-	// var au AuthMsg
-	// err = json.Unmarshal(data, &au)
-	// assert.NoError(t, err)
+	request.RemoteAddr = "127.0.0.1:0"
+	request.Header.Set("Authorization", "Bearer "+base64.StdEncoding.EncodeToString(podSignature)+" "+base64.StdEncoding.EncodeToString(accSignature))
 
-	// log.Info("Authorization TXT", au.Auth)
-	// assert.Equal(t, len(au.Auth) > 0, true)
+	handleDISTest(w, request)
+
+	assert.Equal(t, w.Code, http.StatusOK)
+
+	data, err := ioutil.ReadAll(w.Body)
+	assert.NoError(t, err)
+
+	log.Info("data", string(data))
+	var au AuthMsg
+	err = json.Unmarshal(data, &au)
+	assert.NoError(t, err)
+
+	log.Info("Authorization TXT", au.Auth)
+	assert.Equal(t, len(au.Auth) > 0, true)
 
 }
 

@@ -371,8 +371,15 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 
 			tmp = strings.Trim(slice[0], "\"")
 
+			tmp2 := strings.Split(tmp, "data")
+			if len(tmp2) > 2 {
+				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				log.Info("failed to split the ownerID from the whole name", "answer", tmp)
+				return
+			}
+
 			owner := &OwnerMsg{
-				OwnerID: tmp,
+				OwnerID: tmp2[0],
 			}
 
 			json, err := json.Marshal(owner)
@@ -459,7 +466,7 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 				log.Info("failed to get dataid", "url", r.URL.String())
 				return
 			}
-			id = dns.Fqdn(id)
+			stid := dns.Fqdn(id)
 
 			rec := r.URL.Query().Get("userid")
 			if rec == "" {
@@ -467,7 +474,7 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 				log.Info("failed to get view user id", "url", r.URL.String())
 				return
 			}
-			rec = dns.Fqdn(rec)
+			strec := dns.Fqdn(rec)
 
 			var params AuthorizationParams
 
@@ -509,18 +516,18 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 			qtype := dns.TypeCERT
 
 			req := new(dns.Msg)
-			req.SetQuestion(rec, qtype)
+			req.SetQuestion(strec, qtype)
 
 			msg := handle(req)
 			if msg == nil {
 				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-				log.Info("failed to handle the request", "req", req)
+				log.Info("failed to handle the request 1", "req", req)
 				return
 			}
 
 			if len(msg.Answer) == 0 {
 				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
-				log.Info("failed to find the userkey", "userid", rec)
+				log.Info("failed to find the userkey 1", "userid", rec)
 				return
 			}
 			a := msg.Answer[0]
@@ -547,7 +554,7 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 			err = verifySignature(publicKey, hash([]byte(id+rec)), accSignature)
 			if err != nil {
 				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-				log.Info("failed to verify the access signature", "err", err.Error())
+				log.Info("failed to verify the access signature", "err", err.Error(), "dataid", id, "userid", rec, "pk", pK, "sign", args[2])
 				return
 			}
 
@@ -555,12 +562,12 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 			qtype = dns.TypeRP
 
 			req = new(dns.Msg)
-			req.SetQuestion(rec, qtype)
+			req.SetQuestion(stid, qtype)
 
 			msg = handle(req)
 			if msg == nil {
 				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-				log.Info("failed to handle the request", "req", req)
+				log.Info("failed to handle the request 2", "req", req)
 				return
 			}
 
@@ -572,6 +579,8 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 			a = msg.Answer[0]
 
 			tmp = strings.TrimPrefix(a.String(), a.Header().String())
+			log.Info("tmp", tmp)
+
 			slice = strings.Split(tmp, " ")
 			if len(slice) != 2 {
 				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
@@ -579,7 +588,16 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 				return
 			}
 
-			owner := strings.Trim(slice[0], "\"")
+			tmp = strings.Trim(slice[0], "\"")
+
+			tmp2 := strings.Split(tmp, "data")
+			if len(tmp2) > 2 {
+				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				log.Info("failed to split the ownerID from the whole name", "answer", tmp)
+				return
+			}
+
+			owner := tmp2[0]
 
 			// 获取pod所有者公钥
 			qtype = dns.TypeCERT
@@ -590,13 +608,13 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 			msg = handle(req)
 			if msg == nil {
 				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-				log.Info("failed to handle the request", "req", req)
+				log.Info("failed to handle the request 3", "req", req)
 				return
 			}
 
 			if len(msg.Answer) == 0 {
 				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
-				log.Info("failed to find the userkey", "userid", rec)
+				log.Info("failed to find the userkey2", "userid", owner)
 				return
 			}
 			a = msg.Answer[0]
