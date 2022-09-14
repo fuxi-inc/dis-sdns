@@ -179,6 +179,48 @@ func Test_disQuery(t *testing.T) {
 	// assert.Equal(t, len(au.Auth) > 0, true)
 }
 
+func Test_disAuth(t *testing.T) {
+	t.Parallel()
+
+	// // 授权验证
+	// w := httptest.NewRecorder()
+
+	// pa := &AuthorizationParams{
+	// 	Identifier: "",
+	// 	Recipient:  "b0494c9d-b624-4897-ab11-7450fa53b718.data.fuxi",
+	// }
+
+	// requestAsBytes, err := json.Marshal(request)
+	// assert.NoError(t, err)
+
+	// // TODO 获取私钥
+
+	// podSignature, err := sign(podPK, hash(requestAsBytes))
+	// accSignature, err := sign(accPK, hash(requestAsBytes))
+
+	// request, err := http.NewRequest("GET", "/dis-auth/authorization?userid=weijiuqi.user.fuxi.&dataid=09faf1a7-963a-4799-a476-99804588835f.data.fuxi.")
+	// assert.NoError(t, err)
+
+	// request.RemoteAddr = "127.0.0.1:0"
+	// request.Header.Set("Authorization", "Bearer "+base64.StdEncoding.EncodeToString(podSignature)+" "+base64.StdEncoding.EncodeToString(accSignature))
+
+	// handleDISTest(w, request)
+
+	// assert.Equal(t, w.Code, http.StatusOK)
+
+	// data, err := ioutil.ReadAll(w.Body)
+	// assert.NoError(t, err)
+
+	// log.Info("data", string(data))
+	// var au AuthMsg
+	// err = json.Unmarshal(data, &au)
+	// assert.NoError(t, err)
+
+	// log.Info("Authorization TXT", au.Auth)
+	// assert.Equal(t, len(au.Auth) > 0, true)
+
+}
+
 func Test_dohJSON(t *testing.T) {
 	t.Parallel()
 

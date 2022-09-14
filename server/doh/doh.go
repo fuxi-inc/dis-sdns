@@ -453,23 +453,26 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 
 		// 授权验证
 		if strings.Contains(path, "authorization") {
+			id := r.URL.Query().Get("dataid")
+			if id == "" {
+				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				log.Info("failed to get dataid", "url", r.URL.String())
+				return
+			}
+			id = dns.Fqdn(id)
+
+			rec := r.URL.Query().Get("userid")
+			if rec == "" {
+				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				log.Info("failed to get view user id", "url", r.URL.String())
+				return
+			}
+			rec = dns.Fqdn(rec)
+
 			var params AuthorizationParams
 
-			if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
-				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-				log.Info("failed to decode request body", "err", err.Error())
-				return
-			}
-
-			id := params.Identifier
-			rec := params.Recipient
-
-			if id == "" || rec == "" {
-				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-				paramsJson, _ := json.Marshal(params)
-				log.Info("failed to get one of the params", "params", string(paramsJson))
-				return
-			}
+			params.Identifier = id
+			params.Recipient = rec
 
 			// 从header中获取pod签名
 			sign := r.Header.Get("Authorization")
@@ -503,13 +506,36 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 			}
 
 			// 获取访问者公钥
-			pK, err := getPublicKey(rec)
-			if err != nil {
-				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
-				log.Info("failed to find the userkey", "userid", rec, "error", err)
+			qtype := dns.TypeCERT
+
+			req := new(dns.Msg)
+			req.SetQuestion(rec, qtype)
+
+			msg := handle(req)
+			if msg == nil {
+				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				log.Info("failed to handle the request", "req", req)
 				return
 			}
 
+			if len(msg.Answer) == 0 {
+				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				log.Info("failed to find the userkey", "userid", rec)
+				return
+			}
+			a := msg.Answer[0]
+
+			tmp := strings.TrimPrefix(a.String(), a.Header().String())
+			slice := strings.Split(tmp, " ")
+			if len(slice) != 4 {
+				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				log.Info("failed to split the userkey from the answer RR", "answer", tmp)
+				return
+			}
+
+			pK := slice[3]
+
+			// 转换公钥格式
 			publicKey, err := importPublicKey(pK)
 			if err != nil {
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -517,37 +543,75 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 				return
 			}
 
-			requestAsBytes, err := json.Marshal(params)
-			if err != nil {
-				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-				log.Info("failed to marshal", "err", err.Error())
-				return
-			}
-
 			// 验证访问者签名
-			err = verifySignature(publicKey, hash(requestAsBytes), accSignature)
+			err = verifySignature(publicKey, hash([]byte(id+rec)), accSignature)
 			if err != nil {
-				http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 				log.Info("failed to verify the access signature", "err", err.Error())
 				return
 			}
 
 			// 获取数据标识对应身份（pod）标识
-			owner, err := getOwnerID(id)
-			if err != nil {
-				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
-				log.Info("failed to find the ownerID", "dataid", id, "error", err)
+			qtype = dns.TypeRP
+
+			req = new(dns.Msg)
+			req.SetQuestion(rec, qtype)
+
+			msg = handle(req)
+			if msg == nil {
+				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				log.Info("failed to handle the request", "req", req)
 				return
 			}
+
+			if len(msg.Answer) == 0 {
+				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				log.Info("failed to find the ownerID", "userid", rec)
+				return
+			}
+			a = msg.Answer[0]
+
+			tmp = strings.TrimPrefix(a.String(), a.Header().String())
+			slice = strings.Split(tmp, " ")
+			if len(slice) != 2 {
+				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				log.Info("failed to split the ownerID  from the answer RR", "answer", tmp)
+				return
+			}
+
+			owner := strings.Trim(slice[0], "\"")
 
 			// 获取pod所有者公钥
-			pK, err = getPublicKey(owner)
-			if err != nil {
-				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
-				log.Info("failed to find the userkey", "userid", owner, "error", err)
+			qtype = dns.TypeCERT
+
+			req = new(dns.Msg)
+			req.SetQuestion(owner, qtype)
+
+			msg = handle(req)
+			if msg == nil {
+				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				log.Info("failed to handle the request", "req", req)
 				return
 			}
 
+			if len(msg.Answer) == 0 {
+				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				log.Info("failed to find the userkey", "userid", rec)
+				return
+			}
+			a = msg.Answer[0]
+
+			tmp = strings.TrimPrefix(a.String(), a.Header().String())
+			slice = strings.Split(tmp, " ")
+			if len(slice) != 4 {
+				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				log.Info("failed to split the userkey from the answer RR", "answer", tmp)
+				return
+			}
+
+			pK = slice[3]
+
+			// 转换公钥格式
 			publicKey, err = importPublicKey(pK)
 			if err != nil {
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -556,17 +620,17 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 			}
 
 			// 验证pod所有者签名
-			err = verifySignature(publicKey, hash(requestAsBytes), podSignature)
+			err = verifySignature(publicKey, hash([]byte(id+rec)), podSignature)
 			if err != nil {
-				http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 				log.Info("failed to verify the pod signature", "err", err.Error())
 				return
 			}
 
 			// 验证授权(获取授权TXT记录)
-			tmp, err := getAuthorization(rec, id)
+			tmp, err = getAuthorization(rec, id)
 			if err != nil || tmp == "" {
-				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+				http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
 				log.Info("failed to find the ownerID", "dataid", id, "error", err)
 				return
 			}
@@ -587,7 +651,7 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 			_, _ = w.Write(json)
 
 		} else {
-			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusMethodNotAllowed)
+			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 			return
 		}
 
