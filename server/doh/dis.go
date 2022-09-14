@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
+	"encoding/base32"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -27,8 +28,10 @@ func handleDISTest(w http.ResponseWriter, r *http.Request) {
 	var handleFn func(http.ResponseWriter, *http.Request)
 
 	log.Info("URL Path", r.URL.Path)
-	if strings.Contains(r.URL.Path, "dis-query") {
+	if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "dis-query") {
 		handleFn = HandleDISQuery(handle)
+	} else if r.Method == http.MethodPost && strings.Contains(r.URL.Path, "dis-auth") {
+		handleFn = HandleDISAuth(handle)
 	} else if r.Method == http.MethodGet && r.URL.Query().Get("dns") == "" {
 		handleFn = HandleJSON(handle)
 	} else {
@@ -74,7 +77,78 @@ func getPublicKey(userid string) (string, error) {
 
 }
 
+// 获取所有者标识
+func getOwnerID(dataid string) (string, error) {
+	w := httptest.NewRecorder()
 
+	request, err := http.NewRequest("GET", "/dis-query/owner?dataid="+dataid, nil)
+	if err != nil {
+		return "", err
+	}
+
+	request.RemoteAddr = "127.0.0.1:0"
+
+	handleDISTest(w, request)
+
+	if w.Code != http.StatusOK {
+		return "", errors.New("failed to query the userkey: " + dataid)
+	}
+
+	data, err := ioutil.ReadAll(w.Body)
+	if err != nil {
+		return "", err
+	}
+
+	var ow OwnerMsg
+	err = json.Unmarshal(data, &ow)
+	if err != nil {
+		return "", err
+	}
+
+	if ow.OwnerID != "" {
+		return ow.OwnerID, nil
+	} else {
+		return "", errors.New("failed to find the ownerid: " + dataid)
+	}
+}
+
+func getAuthorization(userid string, dataid string) (string, error) {
+
+	buserid := base32.StdEncoding.EncodeToString(hash([]byte(userid)))
+
+	w := httptest.NewRecorder()
+
+	request, err := http.NewRequest("GET", "/dis-query/auth?dataid="+buserid+"."+dataid, nil)
+	if err != nil {
+		return "", err
+	}
+
+	request.RemoteAddr = "127.0.0.1:0"
+
+	handleDISTest(w, request)
+
+	if w.Code != http.StatusOK {
+		return "", errors.New("failed to query the authorization TXT: " + buserid + "." + dataid)
+	}
+
+	data, err := ioutil.ReadAll(w.Body)
+	if err != nil {
+		return "", err
+	}
+
+	var au AuthMsg
+	err = json.Unmarshal(data, &au)
+	if err != nil {
+		return "", err
+	}
+
+	if au.Auth != "" {
+		return au.Auth, nil
+	} else {
+		return "", errors.New("failed to find the authorization TXT: " + buserid + "." + dataid)
+	}
+
+}
 
 func importPublicKey(pubKey string) (*rsa.PublicKey, error) {
 

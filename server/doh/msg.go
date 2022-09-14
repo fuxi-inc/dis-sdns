@@ -54,6 +54,11 @@ type OwnerMsg struct {
 	OwnerID string `json:"ownerID"`
 }
 
+// 数据TXT记录查询返回
+type AuthMsg struct {
+	Auth string `json:"auth"`
+}
+
 // 授权验证查询请求
 type AuthorizationParams struct {
 	Identifier string `json:"dataID"`

@@ -59,6 +59,8 @@ func Test_disQuery(t *testing.T) {
 	assert.Equal(t, len(dm.DataAddress) > 0, true)
 
 	// 测试身份公钥查询
+	w = httptest.NewRecorder()
+
 	request, err = http.NewRequest("GET", "/dis-query/userkey?userid=weijiuqi.user.fuxi.", nil)
 	assert.NoError(t, err)
 
@@ -81,6 +83,8 @@ func Test_disQuery(t *testing.T) {
 	assert.Equal(t, len(uk.UserKey) > 0, true)
 
 	// 测试POD地址查询
+	w = httptest.NewRecorder()
+
 	request, err = http.NewRequest("GET", "/dis-query/podAddress?userid=weijiuqi.user.fuxi", nil)
 	assert.NoError(t, err)
 
@@ -103,6 +107,8 @@ func Test_disQuery(t *testing.T) {
 	assert.Equal(t, len(pa.PodAddress) > 0, true)
 
 	// 测试所有者标识（RP）
+	w = httptest.NewRecorder()
+
 	request, err = http.NewRequest("GET", "/dis-query/owner?dataid=09faf1a7-963a-4799-a476-99804588835f.data.fuxi.", nil)
 	assert.NoError(t, err)
 
@@ -124,6 +130,53 @@ func Test_disQuery(t *testing.T) {
 	log.Info("OwnerID", ow.OwnerID)
 	assert.Equal(t, len(ow.OwnerID) > 0, true)
 
+	// 测试数据完整性记录（TXT）查询
+	w = httptest.NewRecorder()
+
+	request, err = http.NewRequest("GET", "/dis-query/auth?dataid=21ba902b-42d3-4633-9d92-ce5a709c478f.data.fuxi.", nil)
+	assert.NoError(t, err)
+
+	request.RemoteAddr = "127.0.0.1:0"
+
+	handleDISTest(w, request)
+
+	assert.Equal(t, w.Code, http.StatusOK)
+
+	data, err = ioutil.ReadAll(w.Body)
+	assert.NoError(t, err)
+
+	log.Info("data", string(data))
+
+	var au AuthMsg
+	err = json.Unmarshal(data, &au)
+	assert.NoError(t, err)
+
+	log.Info("AuthTXT", au.Auth)
+	assert.Equal(t, len(au.Auth) > 0, true)
+
+	// 授权验证
+	// w = httptest.NewRecorder()
+
+	// request, err = http.NewRequest("POST", "/dis-auth/authorization?dataid=AWI346YBNIHHNLUB5FWUXJLIYM7TXYNOFHHU77FSEGERQZQ3W5CA====.b0494c9d-b624-4897-ab11-7450fa53b718.data.fuxi.", nil)
+	// assert.NoError(t, err)
+
+	// request.RemoteAddr = "127.0.0.1:0"
+
+	// handleDISTest(w, request)
+
+	// assert.Equal(t, w.Code, http.StatusOK)
+
+	// data, err = ioutil.ReadAll(w.Body)
+	// assert.NoError(t, err)
+
+	// log.Info("data", string(data))
+
+	// var autho AuthMsg
+	// err = json.Unmarshal(data, &autho)
+	// assert.NoError(t, err)
+
+	// log.Info("AuthTXT", au.Auth)
+	// assert.Equal(t, len(au.Auth) > 0, true)
 }
 
 func Test_dohJSON(t *testing.T) {

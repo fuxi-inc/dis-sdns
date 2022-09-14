@@ -76,7 +76,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	var handlerFn func(http.ResponseWriter, *http.Request)
 
-	log.Warn("URL Path", r.URL.Path)
+	// log.Info("URL Path", r.URL.Path)
 	if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "dis-query") {
 		handlerFn = doh.HandleDISQuery(handle)
 	} else if r.Method == http.MethodPost && strings.Contains(r.URL.Path, "dis-auth") {
