@@ -34,6 +34,13 @@ type Msg struct {
 	Authority []RR `json:",omitempty"`
 }
 
+// 标准返回
+type ReturnMsg struct {
+	Status  int                    `json:"code"`
+	Data    map[string]interface{} `json:"data"`
+	Message string                 `json:"message"`
+}
+
 // 数据地址查询返回
 type DataAddressMsg struct {
 	DataAddress string `json:"dataAddress"`

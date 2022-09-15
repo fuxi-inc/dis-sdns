@@ -1,6 +1,7 @@
 package doh
 
 import (
+	"encoding/base32"
 	"encoding/base64"
 	"encoding/json"
 	"io/ioutil"
@@ -164,11 +165,25 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 	return func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 
+		returnMsg := new(ReturnMsg)
+
+		w.Header().Set("Server", "SDNS")
+		w.Header().Set("Content-Type", "application/json")
+
 		// 查询数据地址
 		if strings.Contains(path, "dataAddress") {
 			dataid := r.URL.Query().Get("dataid")
 			if dataid == "" {
-				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusBadRequest,
+					Data:    nil,
+					Message: "失败：无法从路径query参数中获取dataid",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write(json)
+
 				log.Info("failed to get dataid", "url", r.URL.String())
 				return
 			}
@@ -184,13 +199,31 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 
 			msg := handle(req)
 			if msg == nil {
-				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusBadRequest,
+					Data:    nil,
+					Message: "失败：DNS解析无结果",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write(json)
+
 				log.Info("failed to handle the request", "req", req)
 				return
 			}
 
 			if len(msg.Answer) == 0 {
-				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusNotFound,
+					Data:    nil,
+					Message: "失败：数据地址不存在",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write(json)
+
 				log.Info("failed to find the dataAddress", "dataid", dataid)
 				return
 			}
@@ -199,32 +232,52 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 			tmp := strings.TrimPrefix(a.String(), a.Header().String())
 			slice := strings.Split(tmp, " ")
 			if len(slice) != 3 {
-				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusNotFound,
+					Data:    nil,
+					Message: "失败：无法从结果RR中获取数据地址",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write(json)
+
 				log.Info("failed to split the dataAddress from the answer RR", "answer", tmp)
 				return
 			}
 
 			tmp = strings.Trim(slice[2], "\"")
 
-			dataAddress := &DataAddressMsg{
-				DataAddress: tmp,
+			var maps = make(map[string]interface{})
+			maps["dataAddress"] = tmp
+
+			returnMsg = &ReturnMsg{
+				Status:  http.StatusOK,
+				Data:    maps,
+				Message: "成功",
 			}
 
-			json, err := json.Marshal(dataAddress)
+			json, err := json.Marshal(returnMsg)
 			if err != nil {
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 				return
 			}
-
-			w.Header().Set("Server", "SDNS")
-			w.Header().Set("Content-Type", "application/dns-json")
 
 			_, _ = w.Write(json)
 
 		} else if strings.Contains(path, "userkey") {
 			userid := r.URL.Query().Get("userid")
 			if userid == "" {
-				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusBadRequest,
+					Data:    nil,
+					Message: "失败：无法从路径query参数中获取userid",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write(json)
+
 				log.Info("failed to get userid", "url", r.URL.String())
 				return
 			}
@@ -240,13 +293,31 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 
 			msg := handle(req)
 			if msg == nil {
-				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusBadRequest,
+					Data:    nil,
+					Message: "失败：DNS解析无结果",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write(json)
+
 				log.Info("failed to handle the request", "req", req)
 				return
 			}
 
 			if len(msg.Answer) == 0 {
-				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusNotFound,
+					Data:    nil,
+					Message: "失败：用户公钥不存在",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write(json)
+
 				log.Info("failed to find the userkey", "userid", userid)
 				return
 			}
@@ -255,30 +326,50 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 			tmp := strings.TrimPrefix(a.String(), a.Header().String())
 			slice := strings.Split(tmp, " ")
 			if len(slice) != 4 {
-				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusNotFound,
+					Data:    nil,
+					Message: "失败：无法从结果RR中获取用户公钥",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write(json)
+
 				log.Info("failed to split the userkey from the answer RR", "answer", tmp)
 				return
 			}
 
-			userKey := &UserKeyMsg{
-				UserKey: slice[3],
+			var maps = make(map[string]interface{})
+			maps["userKey"] = slice[3]
+
+			returnMsg = &ReturnMsg{
+				Status:  http.StatusOK,
+				Data:    maps,
+				Message: "成功",
 			}
 
-			json, err := json.Marshal(userKey)
+			json, err := json.Marshal(returnMsg)
 			if err != nil {
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 				return
 			}
-
-			w.Header().Set("Server", "SDNS")
-			w.Header().Set("Content-Type", "application/dns-json")
 
 			_, _ = w.Write(json)
 
 		} else if strings.Contains(path, "podAddress") {
 			userid := r.URL.Query().Get("userid")
 			if userid == "" {
-				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusBadRequest,
+					Data:    nil,
+					Message: "失败：无法从路径query参数中获取userid",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write(json)
+
 				log.Info("failed to get userid", "url", r.URL.String())
 				return
 			}
@@ -294,13 +385,31 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 
 			msg := handle(req)
 			if msg == nil {
-				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusBadRequest,
+					Data:    nil,
+					Message: "失败：DNS解析无结果",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write(json)
+
 				log.Info("failed to handle the request", "req", req)
 				return
 			}
 
 			if len(msg.Answer) == 0 {
-				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusNotFound,
+					Data:    nil,
+					Message: "失败：pod地址不存在",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write(json)
+
 				log.Info("failed to find the pod address", "userid", userid)
 				return
 			}
@@ -309,32 +418,52 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 			tmp := strings.TrimPrefix(a.String(), a.Header().String())
 			slice := strings.Split(tmp, " ")
 			if len(slice) != 3 {
-				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusNotFound,
+					Data:    nil,
+					Message: "失败：无法从结果RR中获取pod地址",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write(json)
+
 				log.Info("failed to split the podAddress from the answer RR", "answer", tmp)
 				return
 			}
 
 			tmp = strings.Trim(slice[2], "\"")
 
-			podAddress := &PodAddressMsg{
-				PodAddress: tmp,
+			var maps = make(map[string]interface{})
+			maps["podAddress"] = tmp
+
+			returnMsg = &ReturnMsg{
+				Status:  http.StatusOK,
+				Data:    maps,
+				Message: "成功",
 			}
 
-			json, err := json.Marshal(podAddress)
+			json, err := json.Marshal(returnMsg)
 			if err != nil {
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 				return
 			}
-
-			w.Header().Set("Server", "SDNS")
-			w.Header().Set("Content-Type", "application/dns-json")
 
 			_, _ = w.Write(json)
 
 		} else if strings.Contains(path, "owner") {
 			dataid := r.URL.Query().Get("dataid")
 			if dataid == "" {
-				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusBadRequest,
+					Data:    nil,
+					Message: "失败：无法从路径query参数中获取dataid",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write(json)
+
 				log.Info("failed to get dataid", "url", r.URL.String())
 				return
 			}
@@ -349,13 +478,31 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 
 			msg := handle(req)
 			if msg == nil {
-				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusBadRequest,
+					Data:    nil,
+					Message: "失败：DNS解析无结果",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write(json)
+
 				log.Info("failed to handle the request", "req", req)
 				return
 			}
 
 			if len(msg.Answer) == 0 {
-				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusNotFound,
+					Data:    nil,
+					Message: "失败：数据所有者不存在",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write(json)
+
 				log.Info("failed to find the ownerID", "dataid", dataid)
 				return
 			}
@@ -364,7 +511,16 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 			tmp := strings.TrimPrefix(a.String(), a.Header().String())
 			slice := strings.Split(tmp, " ")
 			if len(slice) != 2 {
-				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusNotFound,
+					Data:    nil,
+					Message: "失败：无法从结果RR中获取所有者标识",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write(json)
+
 				log.Info("failed to split the ownerID from the answer RR", "answer", tmp)
 				return
 			}
@@ -373,30 +529,50 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 
 			tmp2 := strings.Split(tmp, "data")
 			if len(tmp2) > 2 {
-				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusNotFound,
+					Data:    nil,
+					Message: "失败：无法从结果全名中截取到所有者ID",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write(json)
+
 				log.Info("failed to split the ownerID from the whole name", "answer", tmp)
 				return
 			}
 
-			owner := &OwnerMsg{
-				OwnerID: tmp2[0],
+			var maps = make(map[string]interface{})
+			maps["owner"] = tmp2[0]
+
+			returnMsg = &ReturnMsg{
+				Status:  http.StatusOK,
+				Data:    maps,
+				Message: "成功",
 			}
 
-			json, err := json.Marshal(owner)
+			json, err := json.Marshal(returnMsg)
 			if err != nil {
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 				return
 			}
-
-			w.Header().Set("Server", "SDNS")
-			w.Header().Set("Content-Type", "application/dns-json")
 
 			_, _ = w.Write(json)
 
 		} else if strings.Contains(path, "auth") {
 			dataid := r.URL.Query().Get("dataid")
 			if dataid == "" {
-				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusBadRequest,
+					Data:    nil,
+					Message: "失败：无法从路径query参数中获取dataid",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write(json)
+
 				log.Info("failed to get dataid", "url", r.URL.String())
 				return
 			}
@@ -412,13 +588,31 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 
 			msg := handle(req)
 			if msg == nil {
-				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusBadRequest,
+					Data:    nil,
+					Message: "失败：DNS解析无结果",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write(json)
+
 				log.Info("failed to handle the request", "req", req)
 				return
 			}
 
 			if len(msg.Answer) == 0 {
-				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusNotFound,
+					Data:    nil,
+					Message: "失败：数据TXT记录不存在",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write(json)
+
 				log.Info("failed to find the data TXT", "dataid", dataid)
 				return
 			}
@@ -426,27 +620,47 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 
 			tmp := strings.TrimPrefix(a.String(), a.Header().String())
 			if tmp == "" {
-				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusNotFound,
+					Data:    nil,
+					Message: "失败：无法从结果RR中获取数据TXT记录",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write(json)
+
 				log.Info("failed to split the data TXT from the answer RR", "answer", tmp)
 				return
 			}
 
-			auth := &AuthMsg{
-				Auth: tmp,
+			var maps = make(map[string]interface{})
+			maps["auth"] = tmp
+
+			returnMsg = &ReturnMsg{
+				Status:  http.StatusOK,
+				Data:    maps,
+				Message: "成功",
 			}
 
-			json, err := json.Marshal(auth)
+			json, err := json.Marshal(returnMsg)
 			if err != nil {
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 				return
 			}
 
-			w.Header().Set("Server", "SDNS")
-			w.Header().Set("Content-Type", "application/dns-json")
-
 			_, _ = w.Write(json)
+
 		} else {
-			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+			returnMsg = &ReturnMsg{
+				Status:  http.StatusMethodNotAllowed,
+				Data:    nil,
+				Message: "失败：路径错误",
+			}
+
+			json, _ := json.Marshal(returnMsg)
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			_, _ = w.Write(json)
 			return
 		}
 
@@ -458,11 +672,25 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 	return func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 
+		returnMsg := new(ReturnMsg)
+
+		w.Header().Set("Server", "SDNS")
+		w.Header().Set("Content-Type", "application/json")
+
 		// 授权验证
 		if strings.Contains(path, "authorization") {
 			id := r.URL.Query().Get("dataid")
 			if id == "" {
-				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusBadRequest,
+					Data:    nil,
+					Message: "失败：无法从路径query参数中获取dataid",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write(json)
+
 				log.Info("failed to get dataid", "url", r.URL.String())
 				return
 			}
@@ -470,7 +698,16 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 
 			rec := r.URL.Query().Get("userid")
 			if rec == "" {
-				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusBadRequest,
+					Data:    nil,
+					Message: "失败：无法从路径query参数中获取userid",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write(json)
+
 				log.Info("failed to get view user id", "url", r.URL.String())
 				return
 			}
@@ -484,14 +721,32 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 			// 从header中获取pod签名
 			sign := r.Header.Get("Authorization")
 			if sign == "" {
-				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusBadRequest,
+					Data:    nil,
+					Message: "失败：无法从请求Header中获取签名",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write(json)
+
 				log.Info("failed to get the pod signature", "sign", sign)
 				return
 			}
 
 			args := strings.Split(sign, " ")
 			if len(args) != 3 {
-				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusBadRequest,
+					Data:    nil,
+					Message: "失败：无法从Authorization中截取签名",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write(json)
+
 				log.Info("failed to get the pod signature", "sign", sign)
 				return
 			}
@@ -499,7 +754,16 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 			// 截取pod签名
 			podSignature, err := base64.StdEncoding.DecodeString(args[1])
 			if podSignature == nil || err != nil {
-				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusInternalServerError,
+					Data:    nil,
+					Message: "失败：pod签名base64解码失败",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write(json)
+
 				log.Info("failed to decode signature", "err", err.Error())
 				return
 			}
@@ -507,7 +771,16 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 			// 截取访问者签名
 			accSignature, err := base64.StdEncoding.DecodeString(args[2])
 			if accSignature == nil || err != nil {
-				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusInternalServerError,
+					Data:    nil,
+					Message: "失败：访问签名base64解码失败",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write(json)
+
 				log.Info("failed to decode signature", "err", err.Error())
 				return
 			}
@@ -520,13 +793,31 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 
 			msg := handle(req)
 			if msg == nil {
-				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusBadRequest,
+					Data:    nil,
+					Message: "失败：获取访问者公钥时，DNS解析无结果",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write(json)
+
 				log.Info("failed to handle the request 1", "req", req)
 				return
 			}
 
 			if len(msg.Answer) == 0 {
-				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusNotFound,
+					Data:    nil,
+					Message: "失败：访问者公钥不存在",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write(json)
+
 				log.Info("failed to find the userkey 1", "userid", rec)
 				return
 			}
@@ -535,7 +826,16 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 			tmp := strings.TrimPrefix(a.String(), a.Header().String())
 			slice := strings.Split(tmp, " ")
 			if len(slice) != 4 {
-				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusNotFound,
+					Data:    nil,
+					Message: "失败：无法从结果RR中获取访问者公钥",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write(json)
+
 				log.Info("failed to split the userkey from the answer RR", "answer", tmp)
 				return
 			}
@@ -545,7 +845,16 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 			// 转换公钥格式
 			publicKey, err := importPublicKey(pK)
 			if err != nil {
-				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusInternalServerError,
+					Data:    nil,
+					Message: "失败：无法将公钥转换为rsa.PublicKey",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write(json)
+
 				log.Info("failed to transfer to rsa.Publickey", "err", err.Error())
 				return
 			}
@@ -553,7 +862,16 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 			// 验证访问者签名
 			err = verifySignature(publicKey, hash([]byte(id+rec)), accSignature)
 			if err != nil {
-				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusUnauthorized,
+					Data:    nil,
+					Message: "失败：访问者签名验证未通过",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusUnauthorized)
+				_, _ = w.Write(json)
+
 				log.Info("failed to verify the access signature", "err", err.Error(), "dataid", id, "userid", rec, "pk", pK, "sign", args[2])
 				return
 			}
@@ -566,13 +884,31 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 
 			msg = handle(req)
 			if msg == nil {
-				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusBadRequest,
+					Data:    nil,
+					Message: "失败：DNS解析无结果",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write(json)
+
 				log.Info("failed to handle the request 2", "req", req)
 				return
 			}
 
 			if len(msg.Answer) == 0 {
-				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusNotFound,
+					Data:    nil,
+					Message: "失败：所有者标识不存在",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write(json)
+
 				log.Info("failed to find the ownerID", "userid", rec)
 				return
 			}
@@ -583,7 +919,16 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 
 			slice = strings.Split(tmp, " ")
 			if len(slice) != 2 {
-				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusNotFound,
+					Data:    nil,
+					Message: "失败：无法从结果RR中获取所有者标识",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write(json)
+
 				log.Info("failed to split the ownerID  from the answer RR", "answer", tmp)
 				return
 			}
@@ -592,7 +937,16 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 
 			tmp2 := strings.Split(tmp, "data")
 			if len(tmp2) > 2 {
-				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusNotFound,
+					Data:    nil,
+					Message: "失败：无法从结果全名中截取到所有者ID",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write(json)
+
 				log.Info("failed to split the ownerID from the whole name", "answer", tmp)
 				return
 			}
@@ -607,13 +961,31 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 
 			msg = handle(req)
 			if msg == nil {
-				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusBadRequest,
+					Data:    nil,
+					Message: "失败：解析授权TXT记录时，DNS解析无结果",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write(json)
+
 				log.Info("failed to handle the request 3", "req", req)
 				return
 			}
 
 			if len(msg.Answer) == 0 {
-				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusNotFound,
+					Data:    nil,
+					Message: "失败：POD所有者公钥不存在",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write(json)
+
 				log.Info("failed to find the userkey2", "userid", owner)
 				return
 			}
@@ -622,7 +994,16 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 			tmp = strings.TrimPrefix(a.String(), a.Header().String())
 			slice = strings.Split(tmp, " ")
 			if len(slice) != 4 {
-				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusNotFound,
+					Data:    nil,
+					Message: "失败：无法从结果RR中获取POD所有者公钥",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write(json)
+
 				log.Info("failed to split the userkey from the answer RR", "answer", tmp)
 				return
 			}
@@ -632,7 +1013,16 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 			// 转换公钥格式
 			publicKey, err = importPublicKey(pK)
 			if err != nil {
-				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusInternalServerError,
+					Data:    nil,
+					Message: "失败：无法将公钥转换为rsa.PublicKey",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write(json)
+
 				log.Info("failed to transfer to rsa.Publickey", "err", err.Error())
 				return
 			}
@@ -640,38 +1030,109 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 			// 验证pod所有者签名
 			err = verifySignature(publicKey, hash([]byte(id+rec)), podSignature)
 			if err != nil {
-				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusUnauthorized,
+					Data:    nil,
+					Message: "失败：POD所有者签名验证未通过",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusUnauthorized)
+				_, _ = w.Write(json)
+
 				log.Info("failed to verify the pod signature", "err", err.Error())
 				return
 			}
 
 			// 验证授权(获取授权TXT记录)
-			tmp, err = getAuthorization(rec, id)
-			if err != nil || tmp == "" {
-				http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
-				log.Info("failed to find the ownerID", "dataid", id, "error", err)
+			// TODO
+			buserid := base32.StdEncoding.EncodeToString(hash([]byte(rec)))
+
+			qtype = dns.TypeTXT
+
+			req = new(dns.Msg)
+			request := buserid + "." + stid
+
+			req.SetQuestion(request, qtype)
+
+			msg = handle(req)
+			if msg == nil {
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusForbidden,
+					Data:    nil,
+					Message: "失败：授权TXT记录DNS解析无结果，授权验证未通过",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = w.Write(json)
+
+				log.Info("failed to handle the request", "req", req)
 				return
 			}
 
-			auth := &AuthMsg{
-				Auth: tmp,
+			if len(msg.Answer) == 0 {
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusForbidden,
+					Data:    nil,
+					Message: "失败：授权TXT记录不存在，授权验证未通过",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = w.Write(json)
+
+				log.Info("failed to find the authorization TXT", "authid", request)
+				return
+			}
+			a = msg.Answer[0]
+
+			tmp = strings.TrimPrefix(a.String(), a.Header().String())
+			if tmp == "" {
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusForbidden,
+					Data:    nil,
+					Message: "失败：无法从结果RR中获取授权TXT记录，授权验证未通过",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = w.Write(json)
+
+				log.Info("failed to split the authorization TXT from the answer RR", "answer", tmp)
+				return
 			}
 
-			json, err := json.Marshal(auth)
+			var maps = make(map[string]interface{})
+			maps["auth"] = tmp
+
+			returnMsg = &ReturnMsg{
+				Status:  http.StatusOK,
+				Data:    maps,
+				Message: "成功",
+			}
+
+			json, err := json.Marshal(returnMsg)
 			if err != nil {
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 				return
 			}
-
-			w.Header().Set("Server", "SDNS")
-			w.Header().Set("Content-Type", "application/dns-json")
 
 			_, _ = w.Write(json)
 
 		} else if strings.Contains(path, "integrity") {
 			dataid := r.URL.Query().Get("dataid")
 			if dataid == "" {
-				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusBadRequest,
+					Data:    nil,
+					Message: "失败：无法从路径query参数中获取dataid",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write(json)
+
 				log.Info("failed to get dataid", "url", r.URL.String())
 				return
 			}
@@ -679,7 +1140,16 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 
 			dataDigest := r.URL.Query().Get("dataDigest")
 			if dataDigest == "" {
-				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusBadRequest,
+					Data:    nil,
+					Message: "失败：无法从路径query参数中获取dataDigest",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write(json)
+
 				log.Info("failed to get dataDigest", "url", r.URL.String())
 				return
 			}
@@ -692,13 +1162,31 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 
 			msg := handle(req)
 			if msg == nil {
-				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusBadRequest,
+					Data:    nil,
+					Message: "失败：DNS解析无结果",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write(json)
+
 				log.Info("failed to handle the request", "req", req)
 				return
 			}
 
 			if len(msg.Answer) == 0 {
-				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusNotFound,
+					Data:    nil,
+					Message: "失败：数据TXT记录不存在",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write(json)
+
 				log.Info("failed to find the data TXT", "dataid", dataid)
 				return
 			}
@@ -706,7 +1194,16 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 
 			tmp := strings.TrimPrefix(a.String(), a.Header().String())
 			if tmp == "" {
-				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusNotFound,
+					Data:    nil,
+					Message: "失败：无法从结果RR中获取数据TXT记录",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write(json)
+
 				log.Info("failed to split the data TXT from the answer RR", "answer", tmp)
 				return
 			}
@@ -714,28 +1211,48 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 
 			// 判断摘要是否相同
 			if tmp != dataDigest {
-				http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+				returnMsg = &ReturnMsg{
+					Status:  http.StatusForbidden,
+					Data:    nil,
+					Message: "失败：摘要不匹配，完整性验证未通过",
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = w.Write(json)
+
 				log.Info("integrity authentication failed", "tmp", tmp, "dataDigest", dataDigest)
 				return
 			}
 
-			in := &IntegrityMsg{
-				Auth: true,
+			var maps = make(map[string]interface{})
+			maps["integrity"] = true
+
+			returnMsg = &ReturnMsg{
+				Status:  http.StatusOK,
+				Data:    maps,
+				Message: "成功",
 			}
 
-			json, err := json.Marshal(in)
+			json, err := json.Marshal(returnMsg)
 			if err != nil {
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 				return
 			}
 
-			w.Header().Set("Server", "SDNS")
-			w.Header().Set("Content-Type", "application/dns-json")
-
 			_, _ = w.Write(json)
 
 		} else {
-			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+			returnMsg = &ReturnMsg{
+				Status:  http.StatusMethodNotAllowed,
+				Data:    nil,
+				Message: "失败：路径错误",
+			}
+
+			json, _ := json.Marshal(returnMsg)
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			_, _ = w.Write(json)
+
 			return
 		}
 

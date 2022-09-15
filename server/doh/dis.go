@@ -6,13 +6,9 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
-	"encoding/base32"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 
 	"github.com/miekg/dns"
@@ -51,43 +47,43 @@ func handleDISTest(w http.ResponseWriter, r *http.Request) {
 	handleFn(w, r)
 }
 
-func getAuthorization(userid string, dataid string) (string, error) {
+// func getAuthorization(userid string, dataid string) (string, error) {
 
-	buserid := base32.StdEncoding.EncodeToString(hash([]byte(userid)))
+// 	buserid := base32.StdEncoding.EncodeToString(hash([]byte(userid)))
 
-	w := httptest.NewRecorder()
+// 	w := httptest.NewRecorder()
 
-	request, err := http.NewRequest("GET", "/dis-query/auth?dataid="+buserid+"."+dataid, nil)
-	if err != nil {
-		return "", err
-	}
+// 	request, err := http.NewRequest("GET", "/dis-query/auth?dataid="+buserid+"."+dataid, nil)
+// 	if err != nil {
+// 		return "", err
+// 	}
 
-	request.RemoteAddr = "127.0.0.1:0"
+// 	request.RemoteAddr = "127.0.0.1:0"
 
-	handleDISTest(w, request)
+// 	handleDISTest(w, request)
 
-	if w.Code != http.StatusOK {
-		return "", errors.New("failed to query the authorization TXT: " + buserid + "." + dataid)
-	}
+// 	if w.Code != http.StatusOK {
+// 		return "", errors.New("failed to query the authorization TXT: " + buserid + "." + dataid)
+// 	}
 
-	data, err := ioutil.ReadAll(w.Body)
-	if err != nil {
-		return "", err
-	}
+// 	data, err := ioutil.ReadAll(w.Body)
+// 	if err != nil {
+// 		return "", err
+// 	}
 
-	var au AuthMsg
-	err = json.Unmarshal(data, &au)
-	if err != nil {
-		return "", err
-	}
+// 	var au AuthMsg
+// 	err = json.Unmarshal(data, &au)
+// 	if err != nil {
+// 		return "", err
+// 	}
 
-	if au.Auth != "" {
-		return au.Auth, nil
-	} else {
-		return "", errors.New("failed to find the authorization TXT: " + buserid + "." + dataid)
-	}
+// 	if au.Auth != "" {
+// 		return au.Auth, nil
+// 	} else {
+// 		return "", errors.New("failed to find the authorization TXT: " + buserid + "." + dataid)
+// 	}
 
-}
+// }
 
 func importPublicKey(pubKey string) (*rsa.PublicKey, error) {
 

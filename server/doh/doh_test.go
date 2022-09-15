@@ -38,7 +38,7 @@ func Test_disQuery(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	// 测试数据地址查询
-	request, err := http.NewRequest("GET", "/dis-query/dataAddress?dataid=09faf1a7-963a-4799-a476-99804588835f.data.fuxi.", nil)
+	request, err := http.NewRequest("GET", "/dis-query/dataAddress?dataid=7a18f1b2-8664-4867-8034-18625e0b760d.data.fuxi.", nil)
 	assert.NoError(t, err)
 
 	request.RemoteAddr = "127.0.0.1:0"
@@ -51,17 +51,18 @@ func Test_disQuery(t *testing.T) {
 	assert.NoError(t, err)
 
 	log.Info("data", string(data))
-	var dm DataAddressMsg
-	err = json.Unmarshal(data, &dm)
+
+	var m ReturnMsg
+	err = json.Unmarshal(data, &m)
 	assert.NoError(t, err)
 
-	log.Info("DataAddress", dm.DataAddress)
-	assert.Equal(t, len(dm.DataAddress) > 0, true)
+	log.Info("DataAddress", m.Data["dataAddress"])
+	assert.NotNil(t, m.Data["dataAddress"])
 
 	// 测试身份公钥查询
 	w = httptest.NewRecorder()
 
-	request, err = http.NewRequest("GET", "/dis-query/userkey?userid=weijiuqi.user.fuxi.", nil)
+	request, err = http.NewRequest("GET", "/dis-query/userkey?userid=usera.user.fuxi.", nil)
 	assert.NoError(t, err)
 
 	request.RemoteAddr = "127.0.0.1:0"
@@ -75,17 +76,17 @@ func Test_disQuery(t *testing.T) {
 
 	log.Info("data", string(data))
 
-	var uk UserKeyMsg
-	err = json.Unmarshal(data, &uk)
+	var m2 ReturnMsg
+	err = json.Unmarshal(data, &m2)
 	assert.NoError(t, err)
 
-	log.Info("UserKey", uk.UserKey)
-	assert.Equal(t, len(uk.UserKey) > 0, true)
+	log.Info("UserKey", m2.Data["userKey"])
+	assert.NotNil(t, m2.Data["userKey"])
 
 	// 测试POD地址查询
 	w = httptest.NewRecorder()
 
-	request, err = http.NewRequest("GET", "/dis-query/podAddress?userid=weijiuqi.user.fuxi", nil)
+	request, err = http.NewRequest("GET", "/dis-query/podAddress?userid=usera.user.fuxi", nil)
 	assert.NoError(t, err)
 
 	request.RemoteAddr = "127.0.0.1:0"
@@ -99,12 +100,12 @@ func Test_disQuery(t *testing.T) {
 
 	log.Info("data", string(data))
 
-	var pa PodAddressMsg
-	err = json.Unmarshal(data, &pa)
+	var m3 ReturnMsg
+	err = json.Unmarshal(data, &m3)
 	assert.NoError(t, err)
 
-	log.Info("PodAddress", pa.PodAddress)
-	assert.Equal(t, len(pa.PodAddress) > 0, true)
+	log.Info("PodAddress", m3.Data["podAddress"])
+	assert.NotNil(t, m3.Data["podAddress"])
 
 	// 测试所有者标识（RP）
 	w = httptest.NewRecorder()
@@ -123,12 +124,12 @@ func Test_disQuery(t *testing.T) {
 
 	log.Info("data", string(data))
 
-	var ow OwnerMsg
-	err = json.Unmarshal(data, &ow)
+	var m4 ReturnMsg
+	err = json.Unmarshal(data, &m4)
 	assert.NoError(t, err)
 
-	log.Info("OwnerID", ow.OwnerID)
-	assert.Equal(t, len(ow.OwnerID) > 0, true)
+	log.Info("OwnerID", m4.Data["owner"])
+	assert.NotNil(t, m4.Data["owner"])
 
 	// 测试数据完整性记录（TXT）查询
 	w = httptest.NewRecorder()
@@ -147,12 +148,12 @@ func Test_disQuery(t *testing.T) {
 
 	log.Info("data", string(data))
 
-	var au AuthMsg
-	err = json.Unmarshal(data, &au)
+	var m5 ReturnMsg
+	err = json.Unmarshal(data, &m5)
 	assert.NoError(t, err)
 
-	log.Info("AuthTXT", au.Auth)
-	assert.Equal(t, len(au.Auth) > 0, true)
+	log.Info("AuthTXT", m5.Data["auth"])
+	assert.NotNil(t, m5.Data["auth"])
 
 }
 
@@ -200,12 +201,13 @@ func Test_disAuth(t *testing.T) {
 	assert.NoError(t, err)
 
 	log.Info("data", string(data))
-	var au AuthMsg
-	err = json.Unmarshal(data, &au)
+
+	var m ReturnMsg
+	err = json.Unmarshal(data, &m)
 	assert.NoError(t, err)
 
-	log.Info("Authorization TXT", au.Auth)
-	assert.Equal(t, len(au.Auth) > 0, true)
+	log.Info("Authorization TXT", m.Data["auth"])
+	assert.NotNil(t, m.Data["auth"])
 
 	// 完整性验证
 	w = httptest.NewRecorder()
@@ -224,12 +226,12 @@ func Test_disAuth(t *testing.T) {
 
 	log.Info("data", string(data))
 
-	var in IntegrityMsg
-	err = json.Unmarshal(data, &in)
+	var m2 ReturnMsg
+	err = json.Unmarshal(data, &m2)
 	assert.NoError(t, err)
 
-	log.Info("Integrity Auth", in.Auth)
-	assert.Equal(t, in.Auth, true)
+	log.Info("Integrity Auth", m2.Data["integrity"])
+	assert.NotNil(t, m2.Data["integrity"])
 
 }
 
