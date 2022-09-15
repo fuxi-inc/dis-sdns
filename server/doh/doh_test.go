@@ -207,6 +207,30 @@ func Test_disAuth(t *testing.T) {
 	log.Info("Authorization TXT", au.Auth)
 	assert.Equal(t, len(au.Auth) > 0, true)
 
+	// 完整性验证
+	w = httptest.NewRecorder()
+
+	request, err = http.NewRequest("GET", "/dis-auth/integrity?dataid=7a18f1b2-8664-4867-8034-18625e0b760d.data.fuxi.&dataDigest=digest234", nil)
+	assert.NoError(t, err)
+
+	request.RemoteAddr = "127.0.0.1:0"
+
+	handleDISTest(w, request)
+
+	assert.Equal(t, w.Code, http.StatusOK)
+
+	data, err = ioutil.ReadAll(w.Body)
+	assert.NoError(t, err)
+
+	log.Info("data", string(data))
+
+	var in IntegrityMsg
+	err = json.Unmarshal(data, &in)
+	assert.NoError(t, err)
+
+	log.Info("Integrity Auth", in.Auth)
+	assert.Equal(t, in.Auth, true)
+
 }
 
 func Test_dohJSON(t *testing.T) {

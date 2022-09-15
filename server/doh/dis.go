@@ -210,16 +210,6 @@ func verifySignature(publicKey *rsa.PublicKey, hashMsg []byte, signature []byte)
 	return nil
 }
 
-// func sign(privateKey *rsa.PrivateKey, hashMsg []byte) ([]byte, error) {
-
-// 	signature, err := rsa.SignPKCS1v15(rand.Reader, privateKey, crypto.SHA256, hashMsg)
-// 	if err != nil {
-// 		return nil, errors.New("failed to sign the message")
-// 	}
-
-// 	return signature, nil
-// }
-
 func hash(msg []byte) []byte {
 
 	hash := sha256.New()

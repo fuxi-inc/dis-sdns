@@ -59,6 +59,11 @@ type AuthMsg struct {
 	Auth string `json:"auth"`
 }
 
+// 完整性验证请求返回
+type IntegrityMsg struct {
+	Auth bool `json:"auth"`
+}
+
 // 授权验证查询请求
 type AuthorizationParams struct {
 	Identifier string `json:"dataID"`

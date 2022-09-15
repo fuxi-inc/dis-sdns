@@ -668,6 +668,72 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 
 			_, _ = w.Write(json)
 
+		} else if strings.Contains(path, "integrity") {
+			dataid := r.URL.Query().Get("dataid")
+			if dataid == "" {
+				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				log.Info("failed to get dataid", "url", r.URL.String())
+				return
+			}
+			dataid = dns.Fqdn(dataid)
+
+			dataDigest := r.URL.Query().Get("dataDigest")
+			if dataDigest == "" {
+				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				log.Info("failed to get dataDigest", "url", r.URL.String())
+				return
+			}
+
+			// 获取数据完整性记录
+			qtype := dns.TypeTXT
+
+			req := new(dns.Msg)
+			req.SetQuestion(dataid, qtype)
+
+			msg := handle(req)
+			if msg == nil {
+				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				log.Info("failed to handle the request", "req", req)
+				return
+			}
+
+			if len(msg.Answer) == 0 {
+				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				log.Info("failed to find the data TXT", "dataid", dataid)
+				return
+			}
+			a := msg.Answer[0]
+
+			tmp := strings.TrimPrefix(a.String(), a.Header().String())
+			if tmp == "" {
+				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				log.Info("failed to split the data TXT from the answer RR", "answer", tmp)
+				return
+			}
+			tmp = strings.Trim(tmp, "\"")
+
+			// 判断摘要是否相同
+			if tmp != dataDigest {
+				http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+				log.Info("integrity authentication failed", "tmp", tmp, "dataDigest", dataDigest)
+				return
+			}
+
+			in := &IntegrityMsg{
+				Auth: true,
+			}
+
+			json, err := json.Marshal(in)
+			if err != nil {
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				return
+			}
+
+			w.Header().Set("Server", "SDNS")
+			w.Header().Set("Content-Type", "application/dns-json")
+
+			_, _ = w.Write(json)
+
 		} else {
 			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 			return
