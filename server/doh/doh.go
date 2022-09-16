@@ -195,6 +195,7 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 
 			req := new(dns.Msg)
 			req.SetQuestion(dataid, qtype)
+			req.SetEdns0(4096, false)
 			// req.AuthenticatedData = true
 
 			msg := handle(req)
@@ -289,6 +290,7 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 
 			req := new(dns.Msg)
 			req.SetQuestion(userid, qtype)
+			req.SetEdns0(4096, false)
 			// req.AuthenticatedData = true
 
 			msg := handle(req)
@@ -381,6 +383,7 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 
 			req := new(dns.Msg)
 			req.SetQuestion(userid, qtype)
+			req.SetEdns0(4096, false)
 			// req.AuthenticatedData = true
 
 			msg := handle(req)
@@ -475,6 +478,7 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 
 			req := new(dns.Msg)
 			req.SetQuestion(dataid, qtype)
+			req.SetEdns0(4096, false)
 
 			msg := handle(req)
 			if msg == nil {
@@ -577,6 +581,7 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 				return
 			}
 			dataid = dns.Fqdn(dataid)
+			log.Info("dataid", dataid)
 
 			log.Info("receive query data TXT", "dataid", dataid)
 
@@ -584,6 +589,8 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 
 			req := new(dns.Msg)
 			req.SetQuestion(dataid, qtype)
+			req.SetEdns0(4096, false)
+
 			// req.AuthenticatedData = true
 
 			msg := handle(req)
@@ -601,6 +608,9 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 				log.Info("failed to handle the request", "req", req)
 				return
 			}
+
+			log.Info("msg", msg.String())
+			log.Info("len", len(msg.Answer))
 
 			if len(msg.Answer) == 0 {
 				returnMsg = &ReturnMsg{
@@ -790,6 +800,7 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 
 			req := new(dns.Msg)
 			req.SetQuestion(strec, qtype)
+			req.SetEdns0(4096, false)
 
 			msg := handle(req)
 			if msg == nil {
@@ -881,6 +892,7 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 
 			req = new(dns.Msg)
 			req.SetQuestion(stid, qtype)
+			req.SetEdns0(4096, false)
 
 			msg = handle(req)
 			if msg == nil {
@@ -958,6 +970,7 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 
 			req = new(dns.Msg)
 			req.SetQuestion(owner, qtype)
+			req.SetEdns0(4096, false)
 
 			msg = handle(req)
 			if msg == nil {
@@ -1054,6 +1067,7 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 			request := buserid + "." + stid
 
 			req.SetQuestion(request, qtype)
+			req.SetEdns0(4096, false)
 
 			msg = handle(req)
 			if msg == nil {
@@ -1159,6 +1173,7 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 
 			req := new(dns.Msg)
 			req.SetQuestion(dataid, qtype)
+			req.SetEdns0(4096, false)
 
 			msg := handle(req)
 			if msg == nil {

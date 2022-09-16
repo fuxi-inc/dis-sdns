@@ -33,7 +33,7 @@ func handleTest(w http.ResponseWriter, r *http.Request) {
 }
 
 func Test_disQuery(t *testing.T) {
-	t.Parallel()
+	// t.Parallel()
 
 	w := httptest.NewRecorder()
 
@@ -134,7 +134,7 @@ func Test_disQuery(t *testing.T) {
 	// 测试数据完整性记录（TXT）查询
 	w = httptest.NewRecorder()
 
-	request, err = http.NewRequest("GET", "/dis-query/auth?dataid=7a18f1b2-8664-4867-8034-18625e0b760d.data.fuxi.", nil)
+	request, err = http.NewRequest("GET", "/dis-query/auth?dataid=UFOF2BG2CHHIU6ZB754VN2VPHPE7T2GAVDGWKO47ARYZUO3RQUDA====.bdb94333-19f2-4991-a9be-1ced18ac9c34.data.fuxi.", nil)
 	assert.NoError(t, err)
 
 	request.RemoteAddr = "127.0.0.1:0"
