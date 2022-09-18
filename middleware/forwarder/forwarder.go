@@ -60,6 +60,8 @@ func (f *Forwarder) ServeDNS(ctx context.Context, ch *middleware.Chain) {
 
 	for _, server := range f.servers {
 		resp, err := dns.Exchange(req, server)
+		log.Info("req", req.String())
+		log.Info("resp", resp.String())
 
 		if err != nil {
 			log.Warn("forwarder query failed", "query", formatQuestion(req.Question[0]), "error", err.Error())

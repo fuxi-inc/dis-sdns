@@ -62,7 +62,7 @@ func Test_disQuery(t *testing.T) {
 	// 测试身份公钥查询
 	w = httptest.NewRecorder()
 
-	request, err = http.NewRequest("GET", "/dis-query/userkey?userid=usera.user.fuxi.", nil)
+	request, err = http.NewRequest("GET", "/dis-query/userkey?userid=userz.user.fuxi.", nil)
 	assert.NoError(t, err)
 
 	request.RemoteAddr = "127.0.0.1:0"
@@ -86,7 +86,7 @@ func Test_disQuery(t *testing.T) {
 	// 测试POD地址查询
 	w = httptest.NewRecorder()
 
-	request, err = http.NewRequest("GET", "/dis-query/podAddress?userid=usera.user.fuxi", nil)
+	request, err = http.NewRequest("GET", "/dis-query/podAddress?userid=userz.user.fuxi", nil)
 	assert.NoError(t, err)
 
 	request.RemoteAddr = "127.0.0.1:0"
