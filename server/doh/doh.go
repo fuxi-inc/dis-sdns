@@ -1309,6 +1309,195 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 
 			_, _ = w.Write(json)
 
+		} else if strings.Contains(path, "identity") {
+			id := r.URL.Query().Get("userid")
+			if id == "" {
+				returnMsg = &ReturnMsg{
+					Status: http.StatusBadRequest,
+					Data:   nil,
+					// Message: "失败：无法从路径query参数中获取userid",
+					Message: errmsg.GetErrMsg(http.StatusBadRequest),
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write(json)
+
+				log.Info("failed to get userid", "url", r.URL.String())
+				return
+			}
+			stid := dns.Fqdn(id)
+
+			//从header中获取签名
+			sign := r.Header.Get("Authorization")
+			if sign == "" {
+				returnMsg = &ReturnMsg{
+					Status: http.StatusBadRequest,
+					Data:   nil,
+					// Message: "失败：无法从请求Header中获取identity签名",
+					Message: errmsg.GetErrMsg(http.StatusBadRequest),
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write(json)
+
+				log.Info("failed to get the identity signature", "sign", sign)
+				return
+			}
+
+			args := strings.Split(sign, " ")
+			if len(args) != 2 {
+				returnMsg = &ReturnMsg{
+					Status: http.StatusBadRequest,
+					Data:   nil,
+					// Message: "失败：无法从Authorization中截取identity签名",
+					Message: errmsg.GetErrMsg(http.StatusBadRequest),
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write(json)
+
+				log.Info("failed to get the identity signature", "sign", sign)
+				return
+			}
+
+			signature, err := base64.StdEncoding.DecodeString(args[1])
+			if signature == nil || err != nil {
+				returnMsg = &ReturnMsg{
+					Status: http.StatusInternalServerError,
+					Data:   nil,
+					// Message: "失败：identity签名base64解码失败",
+					Message: errmsg.GetErrMsg(http.StatusInternalServerError),
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write(json)
+
+				log.Info("failed to decode identity signature", "err", err.Error())
+				return
+			}
+
+			// 获取identity公钥
+			qtype := dns.TypeCERT
+
+			req := new(dns.Msg)
+			req.SetQuestion(stid, qtype)
+			req.SetEdns0(4096, false)
+
+			msg := handle(req)
+			if msg == nil {
+				returnMsg = &ReturnMsg{
+					Status: http.StatusBadRequest,
+					Data:   nil,
+					// Message: "失败：获取identity公钥时，DNS解析无结果",
+					Message: errmsg.GetErrMsg(http.StatusBadRequest),
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write(json)
+
+				log.Info("failed to handle the identity cert request ", "req", req)
+				return
+			}
+
+			if len(msg.Answer) == 0 {
+				returnMsg = &ReturnMsg{
+					Status: http.StatusNotFound,
+					Data:   nil,
+					// Message: "失败：identity公钥不存在",
+					Message: errmsg.GetErrMsg(http.StatusNotFound),
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write(json)
+
+				log.Info("failed to find the identity userkey", "userid", id)
+				return
+			}
+			a := msg.Answer[0]
+
+			tmp := strings.TrimPrefix(a.String(), a.Header().String())
+			slice := strings.Split(tmp, " ")
+			if len(slice) != 4 {
+				returnMsg = &ReturnMsg{
+					Status: http.StatusNotFound,
+					Data:   nil,
+					// Message: "失败：无法从结果RR中获取identitiy公钥",
+					Message: errmsg.GetErrMsg(http.StatusNotFound),
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write(json)
+
+				log.Info("failed to split the identity userkey from the answer RR", "answer", tmp)
+				return
+			}
+
+			pK := slice[3]
+
+			// 转换公钥格式
+			publicKey, err := importPublicKey(pK)
+			if err != nil {
+				returnMsg = &ReturnMsg{
+					Status: http.StatusInternalServerError,
+					Data:   nil,
+					// Message: "失败：无法将公钥转换为rsa.PublicKey",
+					Message: errmsg.GetErrMsg(http.StatusInternalServerError),
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write(json)
+
+				log.Info("failed to transfer to rsa.Publickey", "err", err.Error())
+				return
+			}
+
+			// 验证identity所有者签名
+			err = verifySignature(publicKey, hash([]byte(id)), signature)
+			if err != nil {
+
+				var maps = make(map[string]interface{})
+				maps["pass"] = false
+
+				returnMsg = &ReturnMsg{
+					Status: http.StatusUnauthorized,
+					Data:   maps,
+					// Message: "失败：identity所有者签名验证未通过",
+					Message: errmsg.GetErrMsg(http.StatusUnauthorized),
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusUnauthorized)
+				_, _ = w.Write(json)
+
+				log.Info("failed to verify the identity signature", "err", err.Error())
+				return
+			}
+
+			var maps = make(map[string]interface{})
+			maps["pass"] = true
+
+			returnMsg = &ReturnMsg{
+				Status:  http.StatusOK,
+				Data:    maps,
+				Message: errmsg.GetErrMsg(http.StatusOK),
+			}
+
+			json, err := json.Marshal(returnMsg)
+			if err != nil {
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				return
+			}
+
+			_, _ = w.Write(json)
+
 		} else {
 			returnMsg = &ReturnMsg{
 				Status: http.StatusBadRequest,
