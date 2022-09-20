@@ -6,17 +6,12 @@ package cache
 import (
 	"context"
 	"encoding/json"
-	"errors"
-	"io/ioutil"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	fabconfig "github.com/hyperledger/fabric-sdk-go/pkg/core/config"
-	"github.com/hyperledger/fabric-sdk-go/pkg/gateway"
 	"github.com/semihalev/log"
 	"github.com/semihalev/sdns/middleware"
 	"github.com/semihalev/sdns/waitgroup"
@@ -60,33 +55,6 @@ type ResponseWriter struct {
 
 var debugns bool
 
-var fabCon = true
-var contract *gateway.Contract
-
-var credPath = filepath.Join(
-	"/home",
-	"fuxi",
-	"fabric-samples",
-	"test-network",
-	"organizations",
-	"peerOrganizations",
-	"org1.example.com",
-	"users",
-	"User1@org1.example.com",
-	"msp",
-)
-
-var ccpPath = filepath.Join(
-	"/home",
-	"fuxi",
-	"fabric-samples",
-	"test-network",
-	"organizations",
-	"peerOrganizations",
-	"org1.example.com",
-	"connection-org1.yaml",
-)
-
 func init() {
 	middleware.Register(name, func(cfg *config.Config) middleware.Handler {
 		return New(cfg)
@@ -102,76 +70,6 @@ func init() {
 		log.Info("cache successfully connect to fabric contract")
 	}
 
-}
-
-// 连接Fabric，返回*gateway.Contract
-func ConnectFab() *gateway.Contract {
-	os.Setenv("DISCOVERY_AS_LOCALHOST", "true")
-	wallet, err := gateway.NewFileSystemWallet("wallet")
-	if err != nil {
-		log.Error("failed to create wallet", "error", err.Error())
-		return nil
-	}
-
-	if !wallet.Exists("resUser") {
-		err = populateWallet(wallet)
-		if err != nil {
-			log.Error("failed to populate wallet contents", "error", err.Error())
-			return nil
-		}
-	}
-
-	gw, err := gateway.Connect(
-		gateway.WithConfig(fabconfig.FromFile(filepath.Clean(ccpPath))),
-		gateway.WithIdentity(wallet, "resUser"),
-	)
-	if err != nil {
-		log.Error("failed to connect to gateway", "error", err.Error())
-		return nil
-	}
-
-	network, err := gw.GetNetwork("mychannel")
-	if err != nil {
-		log.Error("failed to get network", "error", err.Error())
-		return nil
-	}
-
-	contract := network.GetContract("dis_resolver")
-	return contract
-}
-
-// 创建钱包用户resUser
-func populateWallet(wallet *gateway.Wallet) error {
-
-	certPath := filepath.Join(credPath, "signcerts", "cert.pem")
-	// read the certificate pem
-	cert, err := ioutil.ReadFile(filepath.Clean(certPath))
-	if err != nil {
-		return err
-	}
-
-	keyDir := filepath.Join(credPath, "keystore")
-	// there's a single file in this dir containing the private key
-	files, err := ioutil.ReadDir(keyDir)
-	if err != nil {
-		return err
-	}
-	if len(files) != 1 {
-		return errors.New("keystore folder should have contain one file")
-	}
-	keyPath := filepath.Join(keyDir, files[0].Name())
-	key, err := ioutil.ReadFile(filepath.Clean(keyPath))
-	if err != nil {
-		return err
-	}
-
-	identity := gateway.NewX509Identity("Org1MSP", string(cert), string(key))
-
-	err = wallet.Put("resUser", identity)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 // New return cache
@@ -257,8 +155,8 @@ func (c *Cache) ServeDNS(ctx context.Context, ch *middleware.Chain) {
 	found := false
 
 	// 如果为A记录，进入区块链cache查询
-	if fabCon && q.Qtype == dns.TypeA {
-		log.Info("cache receive a A dns msg", "qname", q.Name, "qtype", q.Qtype, "hashq", hashq)
+	if fabCon {
+		log.Info("fabric cache receive a dns msg", "qname", q.Name, "qtype", q.Qtype, "hashq", hashq)
 
 		// 调用queryRR合约查询资源记录
 		result, err := contract.EvaluateTransaction("queryRR", strconv.FormatUint(hashq, 10))
@@ -274,7 +172,16 @@ func (c *Cache) ServeDNS(ctx context.Context, ch *middleware.Chain) {
 			i = transItem(i_new)
 			found = true
 
-			log.Info("successfully transform the item", "item", i)
+			ttl := i.ttl(now)
+
+			log.Info("successfully get and transform result from fabric cache", "item", i, "remainTTL", ttl)
+
+			// 判断TTL是否到期
+
+			if ttl <= 0 {
+				found = false
+				log.Info("RR from the fabric cache expired in TTL", "item", i, "remainTTL", ttl)
+			}
 
 		} else {
 			// fabric cache上未查到
@@ -362,7 +269,17 @@ func (w *ResponseWriter) WriteMsg(res *dns.Msg) error {
 		duration = computeTTL(msgTTL, w.minpttl, w.pttl)
 	}
 
-	if duration > 0 {
+	// 写入fabric cache
+	if duration > 0 && fabCon {
+		i := newItem(res, w.now(), duration, w.rate)
+		i_new := transToFabricItem(i)
+
+		// 并行调用CreateRR
+		go i_new.setRR(strconv.FormatUint(key, 10))
+
+		log.Info("successfully submit CreateRR to fabric cache", "item", i_new)
+
+	} else if duration > 0 {
 		w.set(key, res, mt, duration)
 	}
 
@@ -422,7 +339,7 @@ func (c *Cache) GetP(key uint64, req *dns.Msg) (*dns.Msg, *rate.Limiter, error) 
 
 // GetN returns negative entry for a key
 func (c *Cache) GetN(key uint64, req *dns.Msg) (*rate.Limiter, error) {
-	if i, ok := c.ncache.Get(key); ok && i.(*item).ttl(c.now()) > 0 {  
+	if i, ok := c.ncache.Get(key); ok && i.(*item).ttl(c.now()) > 0 {
 		it := i.(*item)
 		return it.Limiter, nil
 	}

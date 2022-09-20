@@ -5,6 +5,7 @@ package cache
 
 import (
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/miekg/dns"
@@ -117,7 +118,7 @@ func transItem(i_new *FabricItem) *item {
 		if err != nil {
 			log.Error("failed to create new Ns RR", "rr", a, "error", err.Error())
 		} else {
-			log.Info("successfully create new Ns RR", "rr", i.Answer[j])
+			log.Info("successfully create new Ns RR", "rr", i.Ns[j])
 		}
 	}
 
@@ -126,7 +127,7 @@ func transItem(i_new *FabricItem) *item {
 		if err != nil {
 			log.Error("failed to create new Extra RR", "rr", a, "error", err.Error())
 		} else {
-			log.Info("successfully create new Extra RR", "rr", i.Answer[j])
+			log.Info("successfully create new Extra RR", "rr", i.Extra[j])
 		}
 	}
 
@@ -173,4 +174,52 @@ func (i *item) toMsg(m *dns.Msg, now time.Time) *dns.Msg {
 func (i *item) ttl(now time.Time) int {
 	ttl := int(i.origTTL) - int(now.UTC().Sub(i.stored).Seconds())
 	return ttl
+}
+
+func transToFabricItem(i *item) *FabricItem {
+	if i == nil {
+		return nil
+	}
+
+	fabricItem := &FabricItem{
+		Rcode:              i.Rcode,
+		Authoritative:      i.Authoritative,
+		AuthenticatedData:  i.AuthenticatedData,
+		RecursionAvailable: i.RecursionAvailable,
+		Answer:             make([]RR, len(i.Answer)),
+		Ns:                 make([]RR, len(i.Ns)),
+		Extra:              make([]RR, len(i.Extra)),
+		Limiter:            i.Limiter,
+		OrigTTL:            i.origTTL,
+		Stored:             i.stored,
+	}
+
+	for i, a := range i.Answer {
+		fabricItem.Answer[i] = RR{
+			Name: a.Header().Name,
+			Type: a.Header().Rrtype,
+			TTL:  a.Header().Ttl,
+			Data: strings.TrimPrefix(a.String(), a.Header().String()),
+		}
+	}
+
+	for i, a := range i.Ns {
+		fabricItem.Ns[i] = RR{
+			Name: a.Header().Name,
+			Type: a.Header().Rrtype,
+			TTL:  a.Header().Ttl,
+			Data: strings.TrimPrefix(a.String(), a.Header().String()),
+		}
+	}
+
+	for i, a := range i.Extra {
+		fabricItem.Extra[i] = RR{
+			Name: a.Header().Name,
+			Type: a.Header().Rrtype,
+			TTL:  a.Header().Ttl,
+			Data: strings.TrimPrefix(a.String(), a.Header().String()),
+		}
+	}
+
+	return fabricItem
 }
