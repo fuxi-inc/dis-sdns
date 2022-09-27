@@ -77,6 +77,11 @@ type AuthorizationParams struct {
 	Recipient  string `json:"viewUserID"`
 }
 
+// 身份验证签名体
+type AuthIdentitySign struct {
+	ID string `json:"userid"`
+}
+
 // NewMsg function
 func NewMsg(m *dns.Msg) *Msg {
 	if m == nil {

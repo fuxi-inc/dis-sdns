@@ -168,6 +168,7 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 
 		returnMsg := new(ReturnMsg)
 
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Server", "SDNS")
 		w.Header().Set("Content-Type", "application/json")
 
@@ -708,6 +709,7 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 		returnMsg := new(ReturnMsg)
 
 		w.Header().Set("Server", "SDNS")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Content-Type", "application/json")
 
 		// 授权验证
@@ -1459,8 +1461,30 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 				return
 			}
 
+			// 构造签名struct
+			authSign := &AuthIdentitySign{
+				ID: id,
+			}
+
+			signAsBytes, err := json.Marshal(authSign)
+			if err != nil {
+				returnMsg = &ReturnMsg{
+					Status: http.StatusInternalServerError,
+					Data:   nil,
+					// Message: "marshal签名体失败",
+					Message: errmsg.GetErrMsg(http.StatusInternalServerError),
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write(json)
+
+				log.Info("failed to marshal the body for identity auth sign", "err", err.Error())
+				return
+			}
+
 			// 验证identity所有者签名
-			err = verifySignature(publicKey, hash([]byte(id)), signature)
+			err = verifySignature(publicKey, hash(signAsBytes), signature)
 			if err != nil {
 
 				var maps = make(map[string]interface{})
