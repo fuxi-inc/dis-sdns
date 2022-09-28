@@ -1,5 +1,7 @@
 module github.com/semihalev/sdns
 
+replace github.com/go-kit/kit => github.com/go-kit/kit v0.8.0
+
 require (
 	github.com/BurntSushi/toml v1.0.0
 	github.com/cespare/xxhash/v2 v2.1.2

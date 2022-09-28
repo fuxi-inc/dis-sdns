@@ -128,7 +128,6 @@ var credPath = filepath.Join(
 	"dis-fabric",
 	"data",
 	"organizations",
-	"peerOrganizations",
 	"org-alpha",
 	"admin",
 	"msp",
