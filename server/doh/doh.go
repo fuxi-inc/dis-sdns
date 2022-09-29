@@ -161,7 +161,6 @@ func HandleJSON(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *http.
 	}
 }
 
-
 // HandleDIS handle dis query request
 func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -805,7 +804,7 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 				w.WriteHeader(http.StatusInternalServerError)
 				_, _ = w.Write(json)
 
-				log.Info("failed to decode signature", "err", err.Error())
+				log.Info("failed to decode pod signature", "err", err.Error(), "sign", args[1])
 				return
 			}
 
@@ -823,7 +822,7 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 				w.WriteHeader(http.StatusInternalServerError)
 				_, _ = w.Write(json)
 
-				log.Info("failed to decode signature", "err", err.Error())
+				log.Info("failed to decode signature", "err", err.Error(), "sign", args[2])
 				return
 			}
 
