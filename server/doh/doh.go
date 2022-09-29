@@ -1,7 +1,6 @@
 package doh
 
 import (
-	"encoding/base32"
 	"encoding/base64"
 	"encoding/json"
 	"io/ioutil"
@@ -732,7 +731,14 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 			}
 			stid := dns.Fqdn(id)
 
-			rec := r.URL.Query().Get("userid")
+			var rec string
+			enrec := r.URL.Query().Get("userid")
+			// baserec, _ := base64.StdEncoding.DecodeString(enrec)
+			// _ = json.Unmarshal(baserec, &rec)
+			rec = enrec
+
+			log.Info("get access userid", "rec", rec, "enrec", enrec)
+
 			if rec == "" {
 				returnMsg = &ReturnMsg{
 					Status: http.StatusBadRequest,
@@ -907,8 +913,8 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 
 			// 构造签名struct
 			authoSign := &AuthAuthoSign{
-				Userid: rec,
 				Dataid: id,
+				Userid: enrec,
 			}
 
 			signAsBytes, err := json.Marshal(authoSign)
@@ -942,7 +948,7 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 				w.WriteHeader(http.StatusUnauthorized)
 				_, _ = w.Write(json)
 
-				log.Info("failed to verify the access signature", "err", err.Error(), "dataid", id, "userid", rec, "pk", pK, "sign", args[2])
+				log.Info("failed to verify the access signature", "err", err.Error(), "dataid", id, "userid", rec, "pk", pK, "sign", args[2], "json", authoSign)
 				return
 			}
 
@@ -1126,8 +1132,9 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 			}
 
 			// 验证授权(获取授权TXT记录)
-			// TODO
-			buserid := base32.StdEncoding.EncodeToString(hash([]byte(rec)))
+			// buserid := base32.StdEncoding.EncodeToString(hash([]byte(rec)))
+
+			buserid := rec
 
 			qtype = dns.TypeTXT
 

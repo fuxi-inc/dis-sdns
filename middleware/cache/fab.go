@@ -12,7 +12,7 @@ import (
 	"github.com/semihalev/log"
 )
 
-var fabCon = true
+var fabCon = false
 var contract *gateway.Contract
 
 var credPath = filepath.Join(
