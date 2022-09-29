@@ -77,6 +77,12 @@ type AuthorizationParams struct {
 	Recipient  string `json:"viewUserID"`
 }
 
+// 授权验证签名体
+type AuthAuthoSign struct {
+	Userid string `json:"userID"`
+	Dataid string `json:"dataID"`
+}
+
 // 身份验证签名体
 type AuthIdentitySign struct {
 	ID string `json:"userid"`

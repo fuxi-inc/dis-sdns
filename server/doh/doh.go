@@ -905,8 +905,31 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 				return
 			}
 
+			// 构造签名struct
+			authoSign := &AuthAuthoSign{
+				Userid: rec,
+				Dataid: id,
+			}
+
+			signAsBytes, err := json.Marshal(authoSign)
+			if err != nil {
+				returnMsg = &ReturnMsg{
+					Status: http.StatusInternalServerError,
+					Data:   nil,
+					// Message: "marshal签名体失败",
+					Message: errmsg.GetErrMsg(http.StatusInternalServerError),
+				}
+
+				json, _ := json.Marshal(returnMsg)
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write(json)
+
+				log.Info("failed to marshal the body for authorization auth sign", "err", err.Error(), "body", authoSign)
+				return
+			}
+
 			// 验证访问者签名
-			err = verifySignature(publicKey, hash([]byte(id+rec)), accSignature)
+			err = verifySignature(publicKey, hash(signAsBytes), accSignature)
 			if err != nil {
 				returnMsg = &ReturnMsg{
 					Status: http.StatusUnauthorized,
