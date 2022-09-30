@@ -190,6 +190,7 @@ func (c *Cache) ServeDNS(ctx context.Context, ch *middleware.Chain) {
 	} else {
 		// 如果不是A记录（或者未连接fabric合约），还是通过传统cache查询
 		i, found = c.get(hashq, now)
+		log.Info("get result from tranditional cache", "item", i)
 	}
 
 	if i != nil && found {

@@ -732,12 +732,9 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 			stid := dns.Fqdn(id)
 
 			var rec string
-			enrec := r.URL.Query().Get("userid")
-			// baserec, _ := base64.StdEncoding.DecodeString(enrec)
-			// _ = json.Unmarshal(baserec, &rec)
-			rec = enrec
+			rec = r.URL.Query().Get("userid")
 
-			log.Info("get access userid", "rec", rec, "enrec", enrec)
+			log.Info("get access userid", "rec", rec)
 
 			if rec == "" {
 				returnMsg = &ReturnMsg{
@@ -754,12 +751,7 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 				log.Info("failed to get view user id", "url", r.URL.String())
 				return
 			}
-			strec := dns.Fqdn(rec)
-
-			var params AuthorizationParams
-
-			params.Identifier = id
-			params.Recipient = rec
+			// strec := dns.Fqdn(rec)
 
 			// 从header中获取pod签名
 			sign := r.Header.Get("Authorization")
@@ -780,7 +772,7 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 			}
 
 			args := strings.Split(sign, " ")
-			if len(args) != 3 {
+			if len(args) != 2 {
 				returnMsg = &ReturnMsg{
 					Status: http.StatusBadRequest,
 					Data:   nil,
@@ -814,152 +806,14 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 				return
 			}
 
-			// 截取访问者签名
-			accSignature, err := base64.StdEncoding.DecodeString(args[2])
-			if accSignature == nil || err != nil {
-				returnMsg = &ReturnMsg{
-					Status: http.StatusInternalServerError,
-					Data:   nil,
-					// Message: "失败：访问签名base64解码失败",
-					Message: errmsg.GetErrMsg(http.StatusInternalServerError),
-				}
-
-				json, _ := json.Marshal(returnMsg)
-				w.WriteHeader(http.StatusInternalServerError)
-				_, _ = w.Write(json)
-
-				log.Info("failed to decode signature", "err", err.Error(), "sign", args[2])
-				return
-			}
-
-			// 获取访问者公钥
-			qtype := dns.TypeCERT
+			// 获取数据标识对应身份（pod）标识
+			qtype := dns.TypeRP
 
 			req := new(dns.Msg)
-			req.SetQuestion(strec, qtype)
-			req.SetEdns0(4096, false)
-
-			msg := handle(req)
-			if msg == nil {
-				returnMsg = &ReturnMsg{
-					Status: http.StatusBadRequest,
-					Data:   nil,
-					// Message: "失败：获取访问者公钥时，DNS解析无结果",
-					Message: errmsg.GetErrMsg(http.StatusBadRequest),
-				}
-
-				json, _ := json.Marshal(returnMsg)
-				w.WriteHeader(http.StatusBadRequest)
-				_, _ = w.Write(json)
-
-				log.Info("failed to handle the request 1", "req", req)
-				return
-			}
-
-			if len(msg.Answer) == 0 {
-				returnMsg = &ReturnMsg{
-					Status: http.StatusNotFound,
-					Data:   nil,
-					// Message: "失败：访问者公钥不存在",
-					Message: errmsg.GetErrMsg(http.StatusNotFound),
-				}
-
-				json, _ := json.Marshal(returnMsg)
-				w.WriteHeader(http.StatusNotFound)
-				_, _ = w.Write(json)
-
-				log.Info("failed to find the userkey 1", "userid", rec)
-				return
-			}
-			a := msg.Answer[0]
-
-			tmp := strings.TrimPrefix(a.String(), a.Header().String())
-			slice := strings.Split(tmp, " ")
-			if len(slice) != 4 {
-				returnMsg = &ReturnMsg{
-					Status: http.StatusNotFound,
-					Data:   nil,
-					// Message: "失败：无法从结果RR中获取访问者公钥",
-					Message: errmsg.GetErrMsg(http.StatusNotFound),
-				}
-
-				json, _ := json.Marshal(returnMsg)
-				w.WriteHeader(http.StatusNotFound)
-				_, _ = w.Write(json)
-
-				log.Info("failed to split the userkey from the answer RR", "answer", tmp)
-				return
-			}
-
-			pK := slice[3]
-
-			// 转换公钥格式
-			publicKey, err := importPublicKey(pK)
-			if err != nil {
-				returnMsg = &ReturnMsg{
-					Status: http.StatusInternalServerError,
-					Data:   nil,
-					// Message: "失败：无法将公钥转换为rsa.PublicKey",
-					Message: errmsg.GetErrMsg(http.StatusInternalServerError),
-				}
-
-				json, _ := json.Marshal(returnMsg)
-				w.WriteHeader(http.StatusInternalServerError)
-				_, _ = w.Write(json)
-
-				log.Info("failed to transfer to rsa.Publickey", "err", err.Error())
-				return
-			}
-
-			// 构造签名struct
-			authoSign := &AuthAuthoSign{
-				Dataid: id,
-				Userid: enrec,
-			}
-
-			signAsBytes, err := json.Marshal(authoSign)
-			if err != nil {
-				returnMsg = &ReturnMsg{
-					Status: http.StatusInternalServerError,
-					Data:   nil,
-					// Message: "marshal签名体失败",
-					Message: errmsg.GetErrMsg(http.StatusInternalServerError),
-				}
-
-				json, _ := json.Marshal(returnMsg)
-				w.WriteHeader(http.StatusInternalServerError)
-				_, _ = w.Write(json)
-
-				log.Info("failed to marshal the body for authorization auth sign", "err", err.Error(), "body", authoSign)
-				return
-			}
-
-			// 验证访问者签名
-			err = verifySignature(publicKey, hash(signAsBytes), accSignature)
-			if err != nil {
-				returnMsg = &ReturnMsg{
-					Status: http.StatusUnauthorized,
-					Data:   nil,
-					// Message: "失败：访问者签名验证未通过",
-					Message: errmsg.GetErrMsg(http.StatusUnauthorized),
-				}
-
-				json, _ := json.Marshal(returnMsg)
-				w.WriteHeader(http.StatusUnauthorized)
-				_, _ = w.Write(json)
-
-				log.Info("failed to verify the access signature", "err", err.Error(), "dataid", id, "userid", rec, "pk", pK, "sign", args[2], "json", authoSign)
-				return
-			}
-
-			// 获取数据标识对应身份（pod）标识
-			qtype = dns.TypeRP
-
-			req = new(dns.Msg)
 			req.SetQuestion(stid, qtype)
 			req.SetEdns0(4096, false)
 
-			msg = handle(req)
+			msg := handle(req)
 			if msg == nil {
 				returnMsg = &ReturnMsg{
 					Status: http.StatusBadRequest,
@@ -988,15 +842,15 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 				w.WriteHeader(http.StatusNotFound)
 				_, _ = w.Write(json)
 
-				log.Info("failed to find the ownerID", "userid", rec)
+				log.Info("failed to find the ownerID", "dataid", stid)
 				return
 			}
-			a = msg.Answer[0]
+			a := msg.Answer[0]
 
-			tmp = strings.TrimPrefix(a.String(), a.Header().String())
+			tmp := strings.TrimPrefix(a.String(), a.Header().String())
 			log.Info("tmp", tmp)
 
-			slice = strings.Split(tmp, " ")
+			slice := strings.Split(tmp, " ")
 			if len(slice) != 2 {
 				returnMsg = &ReturnMsg{
 					Status: http.StatusNotFound,
@@ -1093,10 +947,10 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 				return
 			}
 
-			pK = slice[3]
+			pK := slice[3]
 
 			// 转换公钥格式
-			publicKey, err = importPublicKey(pK)
+			publicKey, err := importPublicKey(pK)
 			if err != nil {
 				returnMsg = &ReturnMsg{
 					Status: http.StatusInternalServerError,
@@ -1127,12 +981,11 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 				w.WriteHeader(http.StatusUnauthorized)
 				_, _ = w.Write(json)
 
-				log.Info("failed to verify the pod signature", "err", err.Error())
+				log.Info("failed to verify the pod signature", "err", err.Error(), "id", id, "rec", rec, "sign", args[1], "pubkey", pK)
 				return
 			}
 
 			// 验证授权(获取授权TXT记录)
-			// buserid := base32.StdEncoding.EncodeToString(hash([]byte(rec)))
 
 			buserid := rec
 
@@ -1140,6 +993,8 @@ func HandleDISAuth(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *ht
 
 			req = new(dns.Msg)
 			request := buserid + "." + stid
+
+			log.Info("auth request", "request", request)
 
 			req.SetQuestion(request, qtype)
 			req.SetEdns0(4096, false)
