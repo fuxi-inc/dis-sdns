@@ -154,43 +154,46 @@ func (c *Cache) ServeDNS(ctx context.Context, ch *middleware.Chain) {
 	// 标记是否在cache中找到item
 	found := false
 
-	// 如果为A记录，进入区块链cache查询
-	if fabCon {
-		log.Info("fabric cache receive a dns msg", "qname", q.Name, "qtype", q.Qtype, "hashq", hashq)
+	i, found = c.get(hashq, now)
+	log.Info("get result from local cache", "item", i)
 
-		// 调用queryRR合约查询资源记录
-		result, err := contract.EvaluateTransaction("queryRR", strconv.FormatUint(hashq, 10))
-		if err == nil {
+	if i == nil || !found {
+		if fabCon {
+			log.Info("fabric cache receive a dns msg", "qname", q.Name, "qtype", q.Qtype, "hashq", hashq)
 
-			err = json.Unmarshal(result, i_new)
-			if err != nil {
-				log.Error("failed to unmarshal", "error", err.Error())
+			// 调用queryRR合约查询资源记录
+			result, err := contract.EvaluateTransaction("queryRR", strconv.FormatUint(hashq, 10))
+			if err == nil {
+
+				err = json.Unmarshal(result, i_new)
+				if err != nil {
+					log.Error("failed to unmarshal", "error", err.Error())
+				}
+
+				// log.Info("successfully unmarshal", "fabricItem", i_new)
+
+				i = transItem(i_new)
+				found = true
+
+				ttl := i.ttl(now)
+
+				log.Info("successfully get and transform result from fabric cache", "item", i, "remainTTL", ttl)
+
+				// 判断TTL是否到期
+				if ttl <= 0 {
+					found = false
+					log.Info("RR from the fabric cache expired in TTL", "item", i, "remainTTL", ttl)
+				}
+
+				// 写入local cache
+				c.pcache.Add(hashq, i)
+				log.Info("successfully add to local cache", "item", i, "key", hashq)
+
+			} else {
+				// fabric cache上未查到
+				log.Info("failed to find the RR from the fabric cache", "error", err.Error())
 			}
-
-			// log.Info("successfully unmarshal", "fabricItem", i_new)
-
-			i = transItem(i_new)
-			found = true
-
-			ttl := i.ttl(now)
-
-			log.Info("successfully get and transform result from fabric cache", "item", i, "remainTTL", ttl)
-
-			// 判断TTL是否到期
-
-			if ttl <= 0 {
-				found = false
-				log.Info("RR from the fabric cache expired in TTL", "item", i, "remainTTL", ttl)
-			}
-
-		} else {
-			// fabric cache上未查到
-			log.Info("failed to find the RR from the fabric cache", "error", err.Error())
 		}
-	} else {
-		// 如果不是A记录（或者未连接fabric合约），还是通过传统cache查询
-		i, found = c.get(hashq, now)
-		log.Info("get result from tranditional cache", "item", i)
 	}
 
 	if i != nil && found {

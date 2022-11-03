@@ -1,0 +1,8 @@
+fabcon: "true"
+channel: "mychannel"
+chaincode_dis: "dis_resolver"
+msp_path: "/home/fuxi/fabric-samples/test-network/organizations/peerOrganizations/org1.example.com/users/User1@org1.example.com/msp"
+con_path: "/home/fuxi/fabric-samples/test-network/organizations/peerOrganizations/org1.example.com/connection-org1.yaml"
+msp_id: "Org1MSP"
+user_name: "resUser"
+discoveryaslocalhost: "true"

@@ -44,10 +44,22 @@ func Test_QueryFabric(t *testing.T) {
 	mw := mock.NewWriter("udp", "127.0.0.1:0")
 	ch.Reset(mw, req)
 
+	now, _ := time.Parse(time.UnixDate, "Fri Apr 21 10:51:21 BST 2017")
+
+	q := req.Question[0]
+
+	// 确认test.com不存在于local cache
+	key := cache.Hash(q)
+	_, found := c.get(key, now)
+	assert.False(t, found)
+
 	c.ServeDNS(context.Background(), ch)
 	assert.True(t, ch.Writer.Written())
 
-	// log.Info("msg", ch.Writer.Msg().String())
+	// 确认cache中有缓存记录
+	i, found := c.get(key, now)
+	assert.True(t, found)
+	assert.NotNil(t, i)
 
 	req.SetQuestion("test2.com.", dns.TypeA)
 	req.SetEdns0(4096, false)
