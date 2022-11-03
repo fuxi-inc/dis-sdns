@@ -1,0 +1,8 @@
+fabcon: "true"
+channel: "dis-channel"
+chaincode_dis: "dis_resolver"
+msp_path: "/home/fuxi/dis-fabric/data/organizations/org-alpha/admin/msp"
+con_path: "./config/qa/connection.yaml"
+msp_id: "org-alpha-msp"
+user_name: "dis-resolver-admin-user"
+discoveryaslocalhost: "false"

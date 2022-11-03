@@ -10,45 +10,84 @@ import (
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/config"
 	"github.com/hyperledger/fabric-sdk-go/pkg/gateway"
 	"github.com/semihalev/log"
+	"github.com/spf13/viper"
+
+	sdnsCfg "github.com/semihalev/sdns/config"
+)
+
+const (
+	DefaultProfile = "dev"
+	ConfigFile     = "connection.yaml"
 )
 
 var fabCon = true
 var contract *gateway.Contract
+var currentProfile string
 
-var credPath = filepath.Join(
-	"/home",
-	"fuxi",
-	"fabric-samples",
-	"test-network",
-	"organizations",
-	"peerOrganizations",
-	"org1.example.com",
-	"users",
-	"User1@org1.example.com",
-	"msp",
-)
+var chainConfig sdnsCfg.ChainCfg
 
-var ccpPath = filepath.Join(
-	"/home",
-	"fuxi",
-	"fabric-samples",
-	"test-network",
-	"organizations",
-	"peerOrganizations",
-	"org1.example.com",
-	"connection-org1.yaml",
-)
+// var credPath = filepath.Join(
+// 	"/home",
+// 	"fuxi",
+// 	"fabric-samples",
+// 	"test-network",
+// 	"organizations",
+// 	"peerOrganizations",
+// 	"org1.example.com",
+// 	"users",
+// 	"User1@org1.example.com",
+// 	"msp",
+// )
+
+// var ccpPath = filepath.Join(
+// 	"/home",
+// 	"fuxi",
+// 	"fabric-samples",
+// 	"test-network",
+// 	"organizations",
+// 	"peerOrganizations",
+// 	"org1.example.com",
+// 	"connection-org1.yaml",
+// )
+
+func ReadChainCfg() sdnsCfg.ChainCfg {
+	v := viper.New()
+
+	currentProfile = os.Getenv("APP_PROFILE")
+	if currentProfile == "" {
+		currentProfile = DefaultProfile
+	}
+
+	v.AutomaticEnv()
+	v.SetConfigName("application")
+	v.AddConfigPath(filepath.Join("config", currentProfile))
+	err := v.ReadInConfig()
+	if err != nil {
+		log.Crit("failed to load chain config file", "error", err.Error())
+	}
+
+	err = v.Unmarshal(&chainConfig)
+	if err != nil {
+		log.Crit("failed to unmarshal chain config", "error", err.Error())
+	}
+
+	return chainConfig
+}
 
 // 连接Fabric，返回*gateway.Contract
 func ConnectFab() *gateway.Contract {
+
 	os.Setenv("DISCOVERY_AS_LOCALHOST", "true")
+
+	chainConfig = ReadChainCfg()
+
 	wallet, err := gateway.NewFileSystemWallet("wallet")
 	if err != nil {
 		log.Error("failed to create wallet", "error", err.Error())
 		return nil
 	}
 
-	if !wallet.Exists("resUser") {
+	if !wallet.Exists(chainConfig.UserName) {
 		err = populateWallet(wallet)
 		if err != nil {
 			log.Error("failed to populate wallet contents", "error", err.Error())
@@ -56,27 +95,32 @@ func ConnectFab() *gateway.Contract {
 		}
 	}
 
+	ccpPath := chainConfig.ConPath
+
 	gw, err := gateway.Connect(
 		gateway.WithConfig(config.FromFile(filepath.Clean(ccpPath))),
-		gateway.WithIdentity(wallet, "resUser"),
+		gateway.WithIdentity(wallet, chainConfig.UserName),
 	)
 	if err != nil {
 		log.Error("failed to connect to gateway", "error", err.Error())
 		return nil
 	}
 
-	network, err := gw.GetNetwork("mychannel")
+	log.Info("channel", chainConfig.Channel)
+	network, err := gw.GetNetwork(chainConfig.Channel)
 	if err != nil {
 		log.Error("failed to get network", "error", err.Error())
 		return nil
 	}
 
-	contract := network.GetContract("dis_resolver")
+	contract := network.GetContract(chainConfig.ChaincodeDIS)
 	return contract
 }
 
 // 创建钱包用户resUser
 func populateWallet(wallet *gateway.Wallet) error {
+
+	credPath := chainConfig.MSPPath
 
 	certPath := filepath.Join(credPath, "signcerts", "cert.pem")
 	// read the certificate pem
@@ -100,9 +144,9 @@ func populateWallet(wallet *gateway.Wallet) error {
 		return err
 	}
 
-	identity := gateway.NewX509Identity("Org1MSP", string(cert), string(key))
+	identity := gateway.NewX509Identity(chainConfig.MSPID, string(cert), string(key))
 
-	err = wallet.Put("resUser", identity)
+	err = wallet.Put(chainConfig.UserName, identity)
 	if err != nil {
 		return err
 	}

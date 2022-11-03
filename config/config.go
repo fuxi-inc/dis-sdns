@@ -60,6 +60,18 @@ type Config struct {
 	sVersion string
 }
 
+// fab application config
+type ChainCfg struct {
+	FabCon               string `mapstructure:"fabcon"`
+	Channel              string `mapstructure:"channel"`
+	ChaincodeDIS         string `mapstructure:"chaincode_dis"`
+	MSPPath              string `mapstructure:"msp_path"`
+	ConPath              string `mapstructure:"con_path"`
+	MSPID                string `mapstructure:"msp_id"`
+	UserName             string `mapstructure:"user_name"`
+	DiscoveryAsLocalhost string `mapstructure:"discoveryaslocalhost"`
+}
+
 // Plugin type
 type Plugin struct {
 	Path   string

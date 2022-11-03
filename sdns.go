@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 
 	"github.com/semihalev/log"
@@ -16,7 +17,10 @@ import (
 	"github.com/semihalev/sdns/server"
 )
 
-const version = "1.2.1"
+const (
+	version        = "1.2.1"
+	DefaultProfile = "dev"
+)
 
 var (
 	flagcfgpath  = flag.String("config", "sdns.conf", "location of the config file, if config file not found, a config will generate")
@@ -42,7 +46,12 @@ func init() {
 func setup() {
 	var err error
 
-	if cfg, err = config.Load(*flagcfgpath, version); err != nil {
+	currentProfile := os.Getenv("APP_PROFILE")
+	if currentProfile == "" {
+		currentProfile = DefaultProfile
+	}
+
+	if cfg, err = config.Load(filepath.Join("config", currentProfile, *flagcfgpath), version); err != nil {
 		log.Crit("Config loading failed", "error", err.Error())
 	}
 
