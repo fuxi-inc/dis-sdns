@@ -53,7 +53,10 @@ type ResponseWriter struct {
 	*Cache
 }
 
+// var fabCon = true
 var debugns bool
+
+// var contract *client.Contract
 
 func init() {
 	middleware.Register(name, func(cfg *config.Config) middleware.Handler {
@@ -147,15 +150,17 @@ func (c *Cache) ServeDNS(ctx context.Context, ch *middleware.Chain) {
 	now := c.now().UTC()
 
 	hashq := cache.Hash(q, req.CheckingDisabled)
-	i := new(item)
+	// i := new(item)
 
 	i_new := new(FabricItem)
 
 	// 标记是否在cache中找到item
 	found := false
 
-	i, found = c.get(hashq, now)
-	log.Info("get result from local cache", "item", i)
+	i, found := c.get(hashq, now)
+	if found && i != nil {
+		log.Info("get result from local cache", "qname", q.Name, "qtype", q.Qtype, "hashq", hashq)
+	}
 
 	if i == nil || !found {
 		if fabCon {
@@ -177,21 +182,21 @@ func (c *Cache) ServeDNS(ctx context.Context, ch *middleware.Chain) {
 
 				ttl := i.ttl(now)
 
-				log.Info("successfully get and transform result from fabric cache", "item", i, "remainTTL", ttl)
+				log.Info("successfully get and transform result from fabric cache", "hashq", hashq, "remainTTL", ttl)
 
 				// 判断TTL是否到期
 				if ttl <= 0 {
 					found = false
-					log.Info("RR from the fabric cache expired in TTL", "item", i, "remainTTL", ttl)
+					log.Info("RR from the fabric cache expired in TTL", "remainTTL", ttl)
 				}
 
 				// 写入local cache
 				c.pcache.Add(hashq, i)
-				log.Info("successfully add to local cache", "item", i, "key", hashq)
+				log.Info("successfully add to local cache", "key", hashq)
 
 			} else {
 				// fabric cache上未查到
-				log.Info("failed to find the RR from the fabric cache", "error", err.Error())
+				log.Info("failed to find the RR from the fabric cache", "hashq", hashq, "error", err.Error())
 			}
 		}
 	}
@@ -281,7 +286,7 @@ func (w *ResponseWriter) WriteMsg(res *dns.Msg) error {
 		// 并行调用CreateRR
 		go i_new.setRR(strconv.FormatUint(key, 10))
 
-		log.Info("successfully submit CreateRR to fabric cache", "item", i_new)
+		log.Info("successfully submit CreateRR to fabric cache", "key", strconv.FormatUint(key, 10), "item", i_new)
 
 	} else if duration > 0 {
 		w.set(key, res, mt, duration)

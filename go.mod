@@ -12,11 +12,14 @@ require (
 	github.com/miekg/dns v1.1.34
 	github.com/prometheus/client_golang v1.12.1
 	github.com/semihalev/log v0.1.1
-	github.com/spf13/viper v1.1.1
-	github.com/stretchr/testify v1.7.0
+	github.com/spf13/viper v1.7.0
+	github.com/stretchr/testify v1.7.1
 	github.com/yl2chen/cidranger v1.0.2
 	go.uber.org/zap v1.22.0
+	golang.org/x/net v0.1.0 // indirect
 	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e
+	google.golang.org/genproto v0.0.0-20221018160656-63c7b68cfc55 // indirect
+	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
 

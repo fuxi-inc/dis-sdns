@@ -1,8 +1,10 @@
 package cache
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -114,6 +116,84 @@ func ConnectFab() *gateway.Contract {
 	}
 
 	contract := network.GetContract(chainConfig.ChaincodeDIS)
+
+	_, notifier, err := contract.RegisterEvent("CreateRR")
+	if err != nil {
+		fmt.Printf("Failed to register contract event: %s", err)
+		return nil
+	}
+	// defer contract.Unregister(reg)
+
+	// consume event
+	go func() {
+		fmt.Printf("------")
+		for e := range notifier {
+			fmt.Printf("Receive cc event, ccid: %v \neventName: %v\n"+
+				"payload: %v \ntxid: %v \nblock: %v \nsourceURL: %v\n",
+				e.ChaincodeID, e.EventName, string(e.Payload), e.TxID, e.BlockNumber, e.SourceURL)
+		}
+		fmt.Printf("++++++")
+	}()
+
+	// time.Sleep(10 * time.Second)
+	// _, err = contract.SubmitTransaction("QueryRR", "4496651133470472589")
+	// if err != nil {
+	// 	fmt.Printf("Failed to submit transaction: %s\n", err)
+	// 	return nil
+	// }
+
+	// var ccEvent *fab.CCEvent
+	// select {
+	// case ccEvent = <-notifier:
+	// 	fmt.Printf("Received CC event: %#v\n", ccEvent)
+	// case <-time.After(time.Minute * 10):
+	// 	fmt.Printf("Did NOT receive CC event for eventId(%s)\n", "CreateRR")
+	// }
+
+	// // create sdk
+	// sdk, err := fabsdk.New(config.FromFile(ccpPath))
+	// if err != nil {
+	// 	log.Error("failed to create fabric sdk", "error", err.Error())
+	// 	return nil
+	// }
+
+	// // New event client
+	// cp := sdk.ChannelContext(chainConfig.Channel, fabsdk.WithUser("User1"), fabsdk.WithOrg("Org1"))
+
+	// ec, err := event.New(
+	// 	cp,
+	// 	event.WithBlockEvents(), // 如果没有，会是filtered
+	// 	// event.WithBlockNum(1), // 从指定区块获取，需要此参数
+	// 	// event.WithSeekType(seek.Newest)
+	// )
+	// if err != nil {
+	// 	log.Error("Create event client error", "error", err.Error())
+	// 	return nil
+	// }
+
+	// // Context used for event listening
+	// ctx, cancel := context.WithCancel(context.Background())
+	// defer cancel()
+
+	// Listen for events emitted by subsequent transactions
+	// _, eventCh, err := ec.RegisterChaincodeEvent(chainConfig.Channel, "CreateRR")
+	// if err != nil {
+	// 	log.Error("Failed to regitser block event", "error", err.Error())
+	// 	return nil
+	// }
+	// defer ec.Unregister(reg)
+
+	// consume event
+	// go func() {
+	// 	fmt.Printf("------")
+	// 	for e := range eventCh {
+	// 		fmt.Printf("Receive cc event, ccid: %v \neventName: %v\n"+
+	// 			"payload: %v \ntxid: %v \nblock: %v \nsourceURL: %v\n",
+	// 			e.ChaincodeID, e.EventName, string(e.Payload), e.TxID, e.BlockNumber, e.SourceURL)
+	// 	}
+	// 	fmt.Printf("======")
+	// }()
+
 	return contract
 }
 
@@ -151,6 +231,14 @@ func populateWallet(wallet *gateway.Wallet) error {
 		return err
 	}
 	return nil
+}
+
+func formatJSON(data []byte) string {
+	var result bytes.Buffer
+	if err := json.Indent(&result, data, "", "  "); err != nil {
+		panic(fmt.Errorf("failed to parse JSON: %w", err))
+	}
+	return result.String()
 }
 
 func (i *FabricItem) setRR(key string) {

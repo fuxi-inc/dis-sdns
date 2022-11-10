@@ -108,8 +108,6 @@ func transItem(i_new *FabricItem) *item {
 		i.Answer[j], err = dns.NewRR(a.Name + " " + strconv.FormatUint(uint64(a.TTL), 10) + " " + dns.TypeToString[a.Type] + " " + a.Data)
 		if err != nil {
 			log.Error("failed to create new Answer RR", "rr", a, "error", err.Error())
-		} else {
-			log.Info("successfully create new Answer RR", "rr", i.Answer[j])
 		}
 	}
 
@@ -117,8 +115,6 @@ func transItem(i_new *FabricItem) *item {
 		i.Ns[j], err = dns.NewRR(a.Name + " " + strconv.FormatUint(uint64(a.TTL), 10) + " " + dns.TypeToString[a.Type] + " " + a.Data)
 		if err != nil {
 			log.Error("failed to create new Ns RR", "rr", a, "error", err.Error())
-		} else {
-			log.Info("successfully create new Ns RR", "rr", i.Ns[j])
 		}
 	}
 
@@ -126,8 +122,6 @@ func transItem(i_new *FabricItem) *item {
 		i.Extra[j], err = dns.NewRR(a.Name + " " + strconv.FormatUint(uint64(a.TTL), 10) + " " + dns.TypeToString[a.Type] + " " + a.Data)
 		if err != nil {
 			log.Error("failed to create new Extra RR", "rr", a, "error", err.Error())
-		} else {
-			log.Info("successfully create new Extra RR", "rr", i.Extra[j])
 		}
 	}
 
