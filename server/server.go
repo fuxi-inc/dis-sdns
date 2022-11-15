@@ -79,8 +79,6 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// log.Info("URL Path", r.URL.Path)
 	if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "dis-query") {
 		handlerFn = doh.HandleDISQuery(handle)
-	} else if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "dis-auth") {
-		handlerFn = doh.HandleDISAuth(handle)
 	} else if r.Method == http.MethodGet && r.URL.Query().Get("dns") == "" {
 		handlerFn = doh.HandleJSON(handle)
 	} else {

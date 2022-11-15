@@ -35,6 +35,9 @@ type FabricItem struct {
 
 	OrigTTL uint32    `json:"originTTL"`
 	Stored  time.Time `json:"stored"`
+
+	Validation bool   `json:"validation"`
+	CreatorID  string `json:"creatorID"`
 }
 
 type item struct {
@@ -186,6 +189,7 @@ func transToFabricItem(i *item) *FabricItem {
 		Limiter:            i.Limiter,
 		OrigTTL:            i.origTTL,
 		Stored:             i.stored,
+		Validation:         false,
 	}
 
 	for i, a := range i.Answer {

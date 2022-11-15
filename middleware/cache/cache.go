@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -157,6 +156,17 @@ func (c *Cache) ServeDNS(ctx context.Context, ch *middleware.Chain) {
 	// 标记是否在cache中找到item
 	found := false
 
+	// 构造fabric key
+	question := Question{
+		Name:   q.Name,
+		Qtype:  q.Qtype,
+		Qclass: q.Qclass,
+	}
+	questionJSON, err := json.Marshal(question)
+	if err != nil {
+		return
+	}
+
 	i, found := c.get(hashq, now)
 	if found && i != nil {
 		log.Info("get result from local cache", "qname", q.Name, "qtype", q.Qtype, "hashq", hashq)
@@ -164,25 +174,29 @@ func (c *Cache) ServeDNS(ctx context.Context, ch *middleware.Chain) {
 
 	if i == nil || !found {
 		if fabCon {
-			log.Info("fabric cache receive a dns msg", "qname", q.Name, "qtype", q.Qtype, "hashq", hashq)
+			log.Info("fabric cache receive a dns msg", "qname", q.Name, "qtype", q.Qtype, "question", string(questionJSON))
 
 			// 调用queryRR合约查询资源记录
-			result, err := contract.EvaluateTransaction("queryRR", strconv.FormatUint(hashq, 10))
+			result, err := contract.EvaluateTransaction("queryRR", string(questionJSON))
 			if err == nil {
 
 				err = json.Unmarshal(result, i_new)
 				if err != nil {
 					log.Error("failed to unmarshal", "error", err.Error())
 				}
-
-				// log.Info("successfully unmarshal", "fabricItem", i_new)
+				found = true
 
 				i = transItem(i_new)
-				found = true
 
 				ttl := i.ttl(now)
 
-				log.Info("successfully get and transform result from fabric cache", "hashq", hashq, "remainTTL", ttl)
+				log.Info("successfully get and transform result from fabric cache", "question", string(questionJSON), "remainTTL", ttl, "item", i_new)
+
+				// 判断validation是否有效
+				if !i_new.Validation {
+					found = false
+					log.Info("RR from the fabric cache has not been validated", "question", string(questionJSON))
+				}
 
 				// 判断TTL是否到期
 				if ttl <= 0 {
@@ -191,12 +205,14 @@ func (c *Cache) ServeDNS(ctx context.Context, ch *middleware.Chain) {
 				}
 
 				// 写入local cache
-				c.pcache.Add(hashq, i)
-				log.Info("successfully add to local cache", "key", hashq)
+				if found {
+					c.pcache.Add(hashq, i)
+					log.Info("successfully add to local cache", "key", hashq)
+				}
 
 			} else {
 				// fabric cache上未查到
-				log.Info("failed to find the RR from the fabric cache", "hashq", hashq, "error", err.Error())
+				log.Info("failed to find the RR from the fabric cache", "question", string(questionJSON), "error", err.Error())
 			}
 		}
 	}
@@ -278,15 +294,26 @@ func (w *ResponseWriter) WriteMsg(res *dns.Msg) error {
 		duration = computeTTL(msgTTL, w.minpttl, w.pttl)
 	}
 
+	// 构造fabric key
+	question := Question{
+		Name:   q.Name,
+		Qtype:  q.Qtype,
+		Qclass: q.Qclass,
+	}
+	questionJSON, err := json.Marshal(question)
+	if err != nil {
+		return err
+	}
+
 	// 写入fabric cache
 	if duration > 0 && fabCon {
 		i := newItem(res, w.now(), duration, w.rate)
 		i_new := transToFabricItem(i)
 
 		// 并行调用CreateRR
-		go i_new.setRR(strconv.FormatUint(key, 10))
+		go i_new.setRR(string(questionJSON))
 
-		log.Info("successfully submit CreateRR to fabric cache", "key", strconv.FormatUint(key, 10), "item", i_new)
+		log.Info("successfully submit CreateRR to fabric cache", "key", string(questionJSON), "item", i_new)
 
 	} else if duration > 0 {
 		w.set(key, res, mt, duration)
@@ -295,6 +322,19 @@ func (w *ResponseWriter) WriteMsg(res *dns.Msg) error {
 	res = w.additionalAnswer(context.Background(), res)
 
 	return w.ResponseWriter.WriteMsg(res)
+}
+
+func (i *FabricItem) setRR(key string) {
+	itemAsBytes, err := json.Marshal(i)
+	if err != nil {
+		log.Error("failed to set RR in fabric cache : failed to marshal", "error", err.Error())
+	}
+
+	_, err = contract.SubmitTransaction("CreateRR", key, string(itemAsBytes))
+	if err != nil {
+		log.Info("failed to submit CreateRR transaction to fabric ")
+	}
+
 }
 
 func (c *Cache) purge(qname string, qtype uint16) {

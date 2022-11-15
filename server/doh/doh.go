@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/fuxi-inc/dis-sdns/errmsg"
 	"github.com/miekg/dns"
 	"github.com/semihalev/log"
-	"github.com/semihalev/sdns/errmsg"
 )
 
 // HandleWireFormat handle wire format
@@ -165,33 +165,34 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 	return func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 
-		returnMsg := new(ReturnMsg)
+		returnMsg := new(err)
 
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Server", "SDNS")
 		w.Header().Set("Content-Type", "application/json")
 
 		// 查询数据地址
-		if strings.Contains(path, "dataAddress") {
-			dataid := r.URL.Query().Get("dataid")
+		if strings.Contains(path, "address") {
+			dataid := r.URL.Query().Get("data_identifier")
 			if dataid == "" {
-				returnMsg = &ReturnMsg{
-					Status: http.StatusBadRequest,
-					Data:   nil,
-					// Message: "失败：无法从路径query参数中获取dataid",
-					Message: errmsg.GetErrMsg(http.StatusBadRequest),
-				}
+				// returnMsg = &ReturnMsg{
+				// 	Status: http.StatusBadRequest,
+				// 	Data:   nil,
+				// 	// Message: "失败：无法从路径query参数中获取dataid",
+				// 	Message: errmsg.GetErrMsg(http.StatusBadRequest),
+				// }
+				err
 
 				json, _ := json.Marshal(returnMsg)
 				w.WriteHeader(http.StatusBadRequest)
 				_, _ = w.Write(json)
 
-				log.Info("failed to get dataid", "url", r.URL.String())
+				log.Info("failed to get data_identifier", "url", r.URL.String())
 				return
 			}
 			dataid = dns.Fqdn(dataid)
 
-			log.Info("receive query data address", "dataid", dataid)
+			log.Info("receive query data address", "data", dataid)
 
 			qtype := dns.TypeURI
 
