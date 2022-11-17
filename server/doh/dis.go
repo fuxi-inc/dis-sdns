@@ -26,7 +26,7 @@ type UserCredential struct {
 
 func handleDISTest(w http.ResponseWriter, r *http.Request) {
 	handle := func(req *dns.Msg) *dns.Msg {
-		msg, _ := dns.Exchange(req, "192.168.10.222:5301")
+		msg, _ := dns.Exchange(req, "106.14.192.31:5301")
 
 		return msg
 	}
@@ -36,8 +36,6 @@ func handleDISTest(w http.ResponseWriter, r *http.Request) {
 	log.Info("URL Path", r.URL.Path)
 	if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "dis-query") {
 		handleFn = HandleDISQuery(handle)
-	} else if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "dis-auth") {
-		handleFn = HandleDISAuth(handle)
 	} else if r.Method == http.MethodGet && r.URL.Query().Get("dns") == "" {
 		handleFn = HandleJSON(handle)
 	} else {

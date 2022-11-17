@@ -13,7 +13,7 @@ import (
 	"github.com/semihalev/log"
 	"github.com/spf13/viper"
 
-	sdnsCfg "github.com/semihalev/sdns/config"
+	sdnsCfg "github.com/fuxi-inc/dis-sdns/config"
 )
 
 const (

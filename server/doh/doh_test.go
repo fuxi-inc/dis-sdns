@@ -38,7 +38,7 @@ func Test_disQuery(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	// 测试数据地址查询
-	request, err := http.NewRequest("GET", "/dis-query/dataAddress?dataid=7a18f1b2-8664-4867-8034-18625e0b760d.data.fuxi.", nil)
+	request, err := http.NewRequest("GET", "/dis-query/data/address?data_identifier=f8b8276f-8869-4c8b-8a1b-a8a2a03ef0cb.data.fuxi.", nil)
 	assert.NoError(t, err)
 
 	request.RemoteAddr = "127.0.0.1:0"
@@ -56,13 +56,13 @@ func Test_disQuery(t *testing.T) {
 	err = json.Unmarshal(data, &m)
 	assert.NoError(t, err)
 
-	log.Info("DataAddress", m.Data["dataAddress"])
-	assert.NotNil(t, m.Data["dataAddress"])
+	log.Info("data_address", m.Data["data_address"])
+	assert.NotNil(t, m.Data["data_address"])
 
 	// 测试身份公钥查询
 	w = httptest.NewRecorder()
 
-	request, err = http.NewRequest("GET", "/dis-query/userkey?userid=userz.user.fuxi.", nil)
+	request, err = http.NewRequest("GET", "/dis-query/users/public-key?identity_identifier=fuyufan.user.fuxi.", nil)
 	assert.NoError(t, err)
 
 	request.RemoteAddr = "127.0.0.1:0"
@@ -80,13 +80,13 @@ func Test_disQuery(t *testing.T) {
 	err = json.Unmarshal(data, &m2)
 	assert.NoError(t, err)
 
-	log.Info("UserKey", m2.Data["userKey"])
-	assert.NotNil(t, m2.Data["userKey"])
+	log.Info("public_key", m2.Data["public_key"])
+	assert.NotNil(t, m2.Data["public_key"])
 
 	// 测试POD地址查询
 	w = httptest.NewRecorder()
 
-	request, err = http.NewRequest("GET", "/dis-query/podAddress?userid=userz.user.fuxi", nil)
+	request, err = http.NewRequest("GET", "/dis-query/users/pod?userid=userz.user.fuxi", nil)
 	assert.NoError(t, err)
 
 	request.RemoteAddr = "127.0.0.1:0"

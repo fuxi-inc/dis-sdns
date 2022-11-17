@@ -12,11 +12,11 @@ import (
 
 	"github.com/miekg/dns"
 
+	"github.com/fuxi-inc/dis-sdns/server/doh"
 	"github.com/semihalev/log"
 	"github.com/semihalev/sdns/config"
 	"github.com/semihalev/sdns/middleware"
 	"github.com/semihalev/sdns/mock"
-	"github.com/semihalev/sdns/server/doh"
 )
 
 // Server type

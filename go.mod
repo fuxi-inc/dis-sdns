@@ -1,4 +1,4 @@
-module github.com/semihalev/sdns
+module github.com/fuxi-inc/dis-sdns
 
 replace github.com/go-kit/kit => github.com/go-kit/kit v0.8.0
 
@@ -12,6 +12,7 @@ require (
 	github.com/miekg/dns v1.1.34
 	github.com/prometheus/client_golang v1.12.1
 	github.com/semihalev/log v0.1.1
+	github.com/semihalev/sdns v1.2.1
 	github.com/spf13/viper v1.7.0
 	github.com/stretchr/testify v1.7.1
 	github.com/yl2chen/cidranger v1.0.2
