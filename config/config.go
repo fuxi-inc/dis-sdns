@@ -62,7 +62,8 @@ type Config struct {
 
 // fab application config
 type ChainCfg struct {
-	FabCon               string `mapstructure:"fabcon"`
+	FabCon               bool   `mapstructure:"fabcon"`
+	Validation_account   int    `mapstructure:"validation_account"`
 	Channel              string `mapstructure:"channel"`
 	ChaincodeDIS         string `mapstructure:"chaincode_dis"`
 	MSPPath              string `mapstructure:"msp_path"`

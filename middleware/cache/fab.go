@@ -21,7 +21,7 @@ const (
 	ConfigFile     = "connection.yaml"
 )
 
-var fabCon = true
+var fabCon = false
 var contract *gateway.Contract
 var currentProfile string
 
@@ -94,6 +94,8 @@ func ConnectFab() *gateway.Contract {
 	os.Setenv("DISCOVERY_AS_LOCALHOST", "true")
 
 	chainConfig = ReadChainCfg()
+
+	fabCon = chainConfig.FabCon
 
 	wallet, err := gateway.NewFileSystemWallet("wallet")
 	if err != nil {
@@ -179,7 +181,7 @@ func ConnectFab() *gateway.Contract {
 				}
 			} else {
 				log.Info("did not vote for true", "key", event.Key)
-				// TODO: 投反对票
+				// TODO: 投反对票?
 			}
 
 		}

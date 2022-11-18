@@ -38,6 +38,9 @@ type FabricItem struct {
 
 	Validation bool   `json:"validation"`
 	CreatorID  string `json:"creatorID"`
+
+	Voters  []string `json:"voters"`
+	Account int      `json:"account"`
 }
 
 type item struct {
@@ -190,6 +193,8 @@ func transToFabricItem(i *item) *FabricItem {
 		OrigTTL:            i.origTTL,
 		Stored:             i.stored,
 		Validation:         false,
+		Voters:             []string{},
+		Account:            chainConfig.Validation_account,
 	}
 
 	for i, a := range i.Answer {

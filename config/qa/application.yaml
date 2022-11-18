@@ -1,4 +1,5 @@
 fabcon: "true"
+validation_account: "1"
 channel: "dis-channel"
 chaincode_dis: "dis_resolver"
 msp_path: "/home/fuxi/dis-fabric/data/organizations/org-alpha/admin/msp"
