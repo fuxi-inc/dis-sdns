@@ -179,6 +179,8 @@ func ConnectFab() *gateway.Contract {
 					log.Error("failed to submit VoteTrue transaction to fabric", "error", err.Error())
 					continue
 				}
+
+				log.Info("Submit VoteTrue transaction to fabric", "key", event.Key)
 			} else {
 				log.Info("did not vote for true", "key", event.Key)
 				// TODO: 投反对票?
