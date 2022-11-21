@@ -16,6 +16,7 @@ func Test_Forwarder(t *testing.T) {
 	cfg.ForwarderServers = []string{"[::255]:53", "8.8.8.8:53", "1"}
 
 	middleware.Setup(cfg)
+	
 
 	f := middleware.Get("forwarder").(*Forwarder)
 	assert.Equal(t, "forwarder", f.Name())

@@ -169,6 +169,12 @@ func ConnectFab() *gateway.Contract {
 				continue
 			}
 
+			if fabricItem.Validation {
+				// no validation required
+				log.Info("no validation required", "key", event.Key)
+				continue
+			}
+
 			// TODO: 验证记录的正确性，决定投票结果
 			// ......
 			validation := true
@@ -227,111 +233,3 @@ func populateWallet(wallet *gateway.Wallet) error {
 	}
 	return nil
 }
-
-// func formatJSON(data []byte) string {
-// 	var result bytes.Buffer
-// 	if err := json.Indent(&result, data, "", "  "); err != nil {
-// 		panic(fmt.Errorf("failed to parse JSON: %w", err))
-// 	}
-// 	return result.String()
-// }
-
-// var credPath = filepath.Join(
-// 	"/home",
-// 	"fuxi",
-// 	"dis-fabric",
-// 	"data",
-// 	"organizations",
-// 	"org-alpha",
-// 	"admin",
-// 	"msp",
-// )
-
-// var ccpPath = filepath.Join(
-// 	"./",
-// 	"config",
-// 	"connection.yaml",
-// )
-
-// // 连接Fabric，返回*gateway.Contract
-// func ConnectFab() *gateway.Contract {
-// 	os.Setenv("DISCOVERY_AS_LOCALHOST", "false")
-// 	wallet, err := gateway.NewFileSystemWallet("wallet")
-// 	if err != nil {
-// 		log.Error("failed to create wallet", "error", err.Error())
-// 		return nil
-// 	}
-
-// 	if !wallet.Exists("dis-resolver-admin-user") {
-// 		err = populateWallet(wallet)
-// 		if err != nil {
-// 			log.Error("failed to populate wallet contents", "error", err.Error())
-// 			return nil
-// 		}
-// 	}
-
-// 	gw, err := gateway.Connect(
-// 		gateway.WithConfig(config.FromFile(filepath.Clean(ccpPath))),
-// 		gateway.WithIdentity(wallet, "dis-resolver-admin-user"),
-// 	)
-// 	if err != nil {
-// 		log.Error("failed to connect to gateway", "error", err.Error())
-// 		return nil
-// 	}
-
-// 	network, err := gw.GetNetwork("dis-channel")
-// 	if err != nil {
-// 		log.Error("failed to get network", "error", err.Error())
-// 		return nil
-// 	}
-
-// 	contract := network.GetContract("dis_resolver")
-// 	return contract
-// }
-
-// // 创建钱包用户resUser
-// func populateWallet(wallet *gateway.Wallet) error {
-
-// 	certPath := filepath.Join(credPath, "signcerts", "cert.pem")
-// 	// read the certificate pem
-// 	cert, err := ioutil.ReadFile(filepath.Clean(certPath))
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	keyDir := filepath.Join(credPath, "keystore")
-// 	// there's a single file in this dir containing the private key
-// 	files, err := ioutil.ReadDir(keyDir)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	if len(files) != 1 {
-// 		return errors.New("keystore folder should have contain one file")
-// 	}
-// 	keyPath := filepath.Join(keyDir, files[0].Name())
-// 	key, err := ioutil.ReadFile(filepath.Clean(keyPath))
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	identity := gateway.NewX509Identity("org-alpha-msp", string(cert), string(key))
-
-// 	err = wallet.Put("dis-resolver-admin-user", identity)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	return nil
-// }
-
-// func (i *FabricItem) setRR(key string) {
-// 	itemAsBytes, err := json.Marshal(i)
-// 	if err != nil {
-// 		log.Error("failed to set RR in fabric cache : failed to marshal", "error", err.Error())
-// 	}
-
-// 	_, err = contract.SubmitTransaction("CreateRR", key, string(itemAsBytes))
-// 	if err != nil {
-// 		log.Info("failed to submit CreateRR transaction to fabric ")
-// 	}
-
-// }

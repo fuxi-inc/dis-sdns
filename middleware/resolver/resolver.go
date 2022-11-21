@@ -143,6 +143,8 @@ func (r *Resolver) parseOutBoundAddrs(cfg *config.Config) {
 func (r *Resolver) Resolve(ctx context.Context, req *dns.Msg, servers *authcache.AuthServers, root bool, depth int, level int, nomin bool, parentdsrr []dns.RR, extra ...bool) (*dns.Msg, error) {
 	q := req.Question[0]
 
+	log.Info("resolve domain req", "length", len(req.Question), "Name", req.Question[0].Name, "Type", req.Question[0].Qtype)
+
 	if root {
 		servers, parentdsrr, level = r.searchCache(q, req.CheckingDisabled, q.Name)
 	}

@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -54,6 +55,7 @@ type ResponseWriter struct {
 
 // var fabCon = true
 var debugns bool
+var validation_account = chainConfig.Validation_account
 
 // var contract *client.Contract
 
@@ -316,6 +318,7 @@ func (w *ResponseWriter) WriteMsg(res *dns.Msg) error {
 		log.Info("successfully submit CreateRR to fabric cache", "key", string(questionJSON), "item", i_new)
 
 	} else if duration > 0 {
+		// write local cache
 		w.set(key, res, mt, duration)
 	}
 
@@ -330,7 +333,7 @@ func (i *FabricItem) setRR(key string) {
 		log.Error("failed to set RR in fabric cache : failed to marshal", "error", err.Error())
 	}
 
-	_, err = contract.SubmitTransaction("CreateRR", key, string(itemAsBytes))
+	_, err = contract.SubmitTransaction("CreateRR", key, string(itemAsBytes), strconv.Itoa(validation_account))
 	if err != nil {
 		log.Info("failed to submit CreateRR transaction to fabric ")
 	}
