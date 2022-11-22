@@ -26,7 +26,7 @@ type UserCredential struct {
 
 func handleDISTest(w http.ResponseWriter, r *http.Request) {
 	handle := func(req *dns.Msg) *dns.Msg {
-		msg, _ := dns.Exchange(req, "106.14.192.31:5301")
+		msg, _ := dns.Exchange(req, "192.168.10.228:5301")
 
 		return msg
 	}

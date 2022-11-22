@@ -229,7 +229,7 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 			tmp = strings.Trim(slice[2], "\"")
 
 			var maps = make(map[string]interface{})
-			maps["data_Address"] = tmp
+			maps["data_address"] = tmp
 
 			// 成功
 			json, err := json.Marshal(errmsg.OK.WithData(maps))
@@ -623,6 +623,8 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 			}
 			domain = dns.Fqdn(domain)
 
+			domain = "_hub_http." + domain
+
 			qtype := dns.TypeSRV
 
 			req := new(dns.Msg)
@@ -640,7 +642,6 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 				return
 			}
 
-			// TODO：需要测试
 			if len(msg.Answer) == 0 {
 				// 失败：域SRV记录不存在
 				json, _ := json.Marshal(errmsg.DataDigestNotFoundError)
@@ -662,6 +663,9 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 				log.Info("failed to split the SRV from the answer RR", "answer", tmp)
 				return
 			}
+
+			str := strings.Split(tmp, " ")
+			tmp = str[len(str)-1]
 
 			var maps = make(map[string]interface{})
 			maps["hub_address"] = tmp
@@ -687,7 +691,7 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 			}
 			stid := dns.Fqdn(id)
 
-			rec := r.URL.Query().Get("userid")
+			rec := r.URL.Query().Get("identity_identifier")
 
 			log.Info("get access userid", "rec", rec)
 

@@ -38,7 +38,7 @@ func Test_disQuery(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	// 测试数据地址查询
-	request, err := http.NewRequest("GET", "/dis-query/data/address?data_identifier=f8b8276f-8869-4c8b-8a1b-a8a2a03ef0cb.data.fuxi.", nil)
+	request, err := http.NewRequest("GET", "/dis-query/data/address?data_identifier=3e542bdf-b330-489e-aaa1-609b6d3ef704.data.fuxi.", nil)
 	assert.NoError(t, err)
 
 	request.RemoteAddr = "127.0.0.1:0"
@@ -62,7 +62,7 @@ func Test_disQuery(t *testing.T) {
 	// 测试身份公钥查询
 	w = httptest.NewRecorder()
 
-	request, err = http.NewRequest("GET", "/dis-query/users/public-key?identity_identifier=fuyufan.user.fuxi.", nil)
+	request, err = http.NewRequest("GET", "/dis-query/users/public-key?identity_identifier=fyftest.user.fuxi.", nil)
 	assert.NoError(t, err)
 
 	request.RemoteAddr = "127.0.0.1:0"
@@ -86,7 +86,7 @@ func Test_disQuery(t *testing.T) {
 	// 测试POD地址查询
 	w = httptest.NewRecorder()
 
-	request, err = http.NewRequest("GET", "/dis-query/users/pod?userid=userz.user.fuxi", nil)
+	request, err = http.NewRequest("GET", "/dis-query/users/pod?identity_identifier=fuyufantest.user.fuxi", nil)
 	assert.NoError(t, err)
 
 	request.RemoteAddr = "127.0.0.1:0"
@@ -104,13 +104,13 @@ func Test_disQuery(t *testing.T) {
 	err = json.Unmarshal(data, &m3)
 	assert.NoError(t, err)
 
-	log.Info("PodAddress", m3.Data["podAddress"])
-	assert.NotNil(t, m3.Data["podAddress"])
+	log.Info("PodAddress", m3.Data["pod_address"])
+	assert.NotNil(t, m3.Data["pod_address"])
 
 	// 测试所有者标识（RP）
 	w = httptest.NewRecorder()
 
-	request, err = http.NewRequest("GET", "/dis-query/owner?dataid=7a18f1b2-8664-4867-8034-18625e0b760d.data.fuxi.", nil)
+	request, err = http.NewRequest("GET", "/dis-query/data/owner?data_identifier=3e542bdf-b330-489e-aaa1-609b6d3ef704.data.fuxi.", nil)
 	assert.NoError(t, err)
 
 	request.RemoteAddr = "127.0.0.1:0"
@@ -128,13 +128,13 @@ func Test_disQuery(t *testing.T) {
 	err = json.Unmarshal(data, &m4)
 	assert.NoError(t, err)
 
-	log.Info("OwnerID", m4.Data["owner"])
-	assert.NotNil(t, m4.Data["owner"])
+	log.Info("OwnerID", m4.Data["owner_identity_identifier"])
+	assert.NotNil(t, m4.Data["owner_identity_identifier"])
 
-	// 测试数据完整性记录（TXT）查询
+	// 测试授权信息（TXT）查询
 	w = httptest.NewRecorder()
 
-	request, err = http.NewRequest("GET", "/dis-query/auth?dataid=UFOF2BG2CHHIU6ZB754VN2VPHPE7T2GAVDGWKO47ARYZUO3RQUDA====.bdb94333-19f2-4991-a9be-1ced18ac9c34.data.fuxi.", nil)
+	request, err = http.NewRequest("GET", "/dis-query/authorization/info?data_identifier=3e542bdf-b330-489e-aaa1-609b6d3ef704.data.fuxi.&creator_identity_identifier=LWJWUCI3YCQFZKUUPSSV7SQG6ZAPLLOLCVQYKOO76FUBVPAC36LA====", nil)
 	assert.NoError(t, err)
 
 	request.RemoteAddr = "127.0.0.1:0"
@@ -152,8 +152,56 @@ func Test_disQuery(t *testing.T) {
 	err = json.Unmarshal(data, &m5)
 	assert.NoError(t, err)
 
-	log.Info("AuthTXT", m5.Data["auth"])
-	assert.NotNil(t, m5.Data["auth"])
+	log.Info("authorization_info", m5.Data["authorization_info"])
+	assert.NotNil(t, m5.Data["authorization_info"])
+
+	// 测试数据摘要（TXT）查询
+	w = httptest.NewRecorder()
+
+	request, err = http.NewRequest("GET", "/dis-query/data/digest?data_identifier=3e542bdf-b330-489e-aaa1-609b6d3ef704.data.fuxi.", nil)
+	assert.NoError(t, err)
+
+	request.RemoteAddr = "127.0.0.1:0"
+
+	handleDISTest(w, request)
+
+	assert.Equal(t, w.Code, http.StatusOK)
+
+	data, err = ioutil.ReadAll(w.Body)
+	assert.NoError(t, err)
+
+	log.Info("data", string(data))
+
+	var m6 ReturnMsg
+	err = json.Unmarshal(data, &m6)
+	assert.NoError(t, err)
+
+	log.Info("data_digest", m6.Data["data_digest"])
+	assert.NotNil(t, m6.Data["data_digest"])
+
+	// 测试hub地址（SRV）查询
+	w = httptest.NewRecorder()
+
+	request, err = http.NewRequest("GET", "/dis-query/hub/address?domain=user.fuxi.", nil)
+	assert.NoError(t, err)
+
+	request.RemoteAddr = "127.0.0.1:0"
+
+	handleDISTest(w, request)
+
+	assert.Equal(t, w.Code, http.StatusOK)
+
+	data, err = ioutil.ReadAll(w.Body)
+	assert.NoError(t, err)
+
+	log.Info("data", string(data))
+
+	var m7 ReturnMsg
+	err = json.Unmarshal(data, &m7)
+	assert.NoError(t, err)
+
+	log.Info("hub_address", m7.Data["hub_address"])
+	assert.NotNil(t, m7.Data["hub_address"])
 
 }
 
@@ -163,16 +211,16 @@ func Test_disAuth(t *testing.T) {
 	// 授权验证
 	w := httptest.NewRecorder()
 
-	userid := "userb.user.fuxi"
-	dataid := "7a18f1b2-8664-4867-8034-18625e0b760d.data.fuxi"
+	userid := "LWJWUCI3YCQFZKUUPSSV7SQG6ZAPLLOLCVQYKOO76FUBVPAC36LA===="
+	dataid := "3e542bdf-b330-489e-aaa1-609b6d3ef704.data.fuxi."
 
-	cred, err := loadUserCredentials("../../test/userb.yaml")
-	assert.NoError(t, err)
+	// cred, err := loadUserCredentials("../../test/userb.yaml")
+	// assert.NoError(t, err)
 
-	accPrivKey, _, err := fetchKeyPair(cred)
-	assert.NoError(t, err)
+	// accPrivKey, _, err := fetchKeyPair(cred)
+	// assert.NoError(t, err)
 
-	cred, err = loadUserCredentials("../../test/usera.yaml")
+	cred, err := loadUserCredentials("../../test/fuyufantest.user.fuxi.yaml")
 	assert.NoError(t, err)
 
 	podPrivKey, _, err := fetchKeyPair(cred)
@@ -181,17 +229,17 @@ func Test_disAuth(t *testing.T) {
 	podSignature, err := sign(podPrivKey, hash([]byte(dataid+userid)))
 	assert.NoError(t, err)
 
-	accSignature, err := sign(accPrivKey, hash([]byte(dataid+userid)))
-	assert.NoError(t, err)
+	// accSignature, err := sign(accPrivKey, hash([]byte(dataid+userid)))
+	// assert.NoError(t, err)
 
-	log.Info("accSignature", base64.StdEncoding.EncodeToString(accSignature))
+	// log.Info("accSignature", base64.StdEncoding.EncodeToString(accSignature))
 	log.Info("podSignature", base64.StdEncoding.EncodeToString(podSignature))
 
-	request, err := http.NewRequest("GET", "/dis-auth/authorization?userid=userb.user.fuxi&dataid=7a18f1b2-8664-4867-8034-18625e0b760d.data.fuxi", nil)
+	request, err := http.NewRequest("GET", "/dis-query/authorization/authentication?identity_identifier=LWJWUCI3YCQFZKUUPSSV7SQG6ZAPLLOLCVQYKOO76FUBVPAC36LA====&data_identifier=3e542bdf-b330-489e-aaa1-609b6d3ef704.data.fuxi.", nil)
 	assert.NoError(t, err)
 
 	request.RemoteAddr = "127.0.0.1:0"
-	request.Header.Set("Authorization", "Bearer "+base64.StdEncoding.EncodeToString(podSignature)+" "+base64.StdEncoding.EncodeToString(accSignature))
+	request.Header.Set("Authorization", "Bearer "+base64.StdEncoding.EncodeToString(podSignature))
 
 	handleDISTest(w, request)
 
@@ -206,13 +254,13 @@ func Test_disAuth(t *testing.T) {
 	err = json.Unmarshal(data, &m)
 	assert.NoError(t, err)
 
-	log.Info("Authorization TXT", m.Data["auth"])
-	assert.NotNil(t, m.Data["auth"])
+	log.Info("Authorization Info", m.Data["authorization_info"])
+	assert.NotNil(t, m.Data["authorization_info"])
 
 	// 完整性验证
 	w = httptest.NewRecorder()
 
-	request, err = http.NewRequest("GET", "/dis-auth/integrity?dataid=7a18f1b2-8664-4867-8034-18625e0b760d.data.fuxi.&dataDigest=digest234", nil)
+	request, err = http.NewRequest("GET", "/dis-query/data/authentication?data_identifier=3e542bdf-b330-489e-aaa1-609b6d3ef704.data.fuxi.&data_digest=digest234-updated", nil)
 	assert.NoError(t, err)
 
 	request.RemoteAddr = "127.0.0.1:0"
@@ -230,8 +278,8 @@ func Test_disAuth(t *testing.T) {
 	err = json.Unmarshal(data, &m2)
 	assert.NoError(t, err)
 
-	log.Info("Integrity Auth", m2.Data["integrity"])
-	assert.NotNil(t, m2.Data["integrity"])
+	log.Info("Data Authentication", m2.Data["pass"])
+	assert.NotNil(t, m2.Data["pass"])
 
 }
 
