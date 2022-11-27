@@ -3,14 +3,15 @@ package doh
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"strings"
 
-	"github.com/fuxi-inc/dis-sdns/server/errmsg"
 	"github.com/miekg/dns"
 	"github.com/semihalev/log"
+	"github.com/semihalev/sdns/server/errmsg"
 )
 
 // HandleWireFormat handle wire format
@@ -693,6 +694,7 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 
 			rec := r.URL.Query().Get("identity_identifier")
 
+			fmt.Println("======")
 			log.Info("get access userid", "rec", rec)
 
 			if rec == "" {

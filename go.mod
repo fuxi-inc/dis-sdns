@@ -5,7 +5,6 @@ replace github.com/go-kit/kit => github.com/go-kit/kit v0.8.0
 require (
 	github.com/BurntSushi/toml v1.0.0
 	github.com/cespare/xxhash/v2 v2.1.2
-	github.com/fuxi-inc/dis-sdns v0.0.0-20221118082822-c609cd051bd2
 	github.com/gin-contrib/cors v1.3.1
 	github.com/gin-contrib/pprof v1.3.0
 	github.com/gin-gonic/gin v1.7.7

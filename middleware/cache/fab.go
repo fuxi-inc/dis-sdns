@@ -17,9 +17,7 @@ import (
 	"github.com/semihalev/sdns/dnsutil"
 	"github.com/spf13/viper"
 
-	sdnsOldCfg "github.com/semihalev/sdns/config"
-
-	sdnsCfg "github.com/fuxi-inc/dis-sdns/config"
+	sdnsCfg "github.com/semihalev/sdns/config"
 )
 
 const (
@@ -293,10 +291,10 @@ func populateWallet(wallet *gateway.Wallet) error {
 }
 
 // config for validation vote
-func makeValidationConfig() *sdnsOldCfg.Config {
+func makeValidationConfig() *sdnsCfg.Config {
 	log.Root().SetHandler(log.LvlFilterHandler(0, log.StdoutHandler))
 
-	cfg := new(sdnsOldCfg.Config)
+	cfg := new(sdnsCfg.Config)
 	cfg.RootServers = []string{"192.5.5.241:53", "198.41.0.4:53",
 		"192.228.79.201:53",
 		"192.33.4.12:53",
