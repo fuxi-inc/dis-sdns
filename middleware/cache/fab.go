@@ -244,7 +244,7 @@ func ConnectFab() *gateway.Contract {
 					continue
 				}
 
-				fmt.Printf("Submit VoteTrue transaction to fabric: %s\n", event.Key)
+				fmt.Printf(" True transaction to fabric: %s\n", event.Key)
 			} else {
 				fmt.Printf("did not vote for true: %s\n", event.Key)
 				// TODO: 投反对票?
@@ -314,7 +314,7 @@ func makeValidationConfig() *sdnsOldCfg.Config {
 	}
 	cfg.Maxdepth = 30
 	cfg.Expire = 600
-	cfg.CacheSize = 1024
+	cfg.CacheSize = 0
 	cfg.Timeout.Duration = 2 * time.Second
 
 	return cfg
