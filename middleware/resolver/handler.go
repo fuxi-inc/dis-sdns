@@ -45,15 +45,10 @@ func New(cfg *config.Config) *DNSHandler {
 }
 
 // Name return middleware name
-func (h *DNSHandler) Name() string { return name }
+func (h *DNSHandler) Name() string { return name + h.cfg.BindDOH + h.cfg.ForwarderServers[0] }
 
 // ServeDNS implements the Handle interface.
 func (h *DNSHandler) ServeDNS(ctx context.Context, ch *middleware.Chain) {
-
-	// if len(h.cfg.ForwarderServers) > 0 {
-	// 	ch.Next(ctx)
-	// 	return
-	// }
 
 	w, req := ch.Writer, ch.Request
 

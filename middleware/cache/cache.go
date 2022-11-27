@@ -55,7 +55,8 @@ type ResponseWriter struct {
 
 // var fabCon = true
 var debugns bool
-var validation_account = chainConfig.Validation_account
+
+// var validation_account = chainConfig.Validation_account
 
 // var contract *client.Contract
 
@@ -333,7 +334,8 @@ func (i *FabricItem) setRR(key string) {
 		log.Error("failed to set RR in fabric cache : failed to marshal", "error", err.Error())
 	}
 
-	_, err = contract.SubmitTransaction("CreateRR", key, string(itemAsBytes), strconv.Itoa(validation_account))
+	log.Info("validation account test", strconv.Itoa(chainConfig.Validation_account))
+	_, err = contract.SubmitTransaction("CreateRR", key, string(itemAsBytes), strconv.Itoa(chainConfig.Validation_account))
 	if err != nil {
 		log.Info("failed to submit CreateRR transaction to fabric ")
 	}
@@ -420,8 +422,8 @@ func (c *Cache) additionalAnswer(ctx context.Context, msg *dns.Msg) *dns.Msg {
 		return msg
 	}
 
-	cnameReq := AcquireMsg()
-	defer ReleaseMsg(cnameReq)
+	cnameReq := AcquireCacheMsg()
+	defer ReleaseCacheMsg(cnameReq)
 
 	cnameReq.SetEdns0(dnsutil.DefaultMsgSize, true)
 	cnameReq.CheckingDisabled = msg.CheckingDisabled
@@ -521,7 +523,7 @@ func computeTTL(msgTTL, minTTL, maxTTL time.Duration) time.Duration {
 var messagePool sync.Pool
 
 // AcquireMsg returns an empty msg from pool
-func AcquireMsg() *dns.Msg {
+func AcquireCacheMsg() *dns.Msg {
 	v := messagePool.Get()
 	if v == nil {
 		return &dns.Msg{}
@@ -530,7 +532,7 @@ func AcquireMsg() *dns.Msg {
 }
 
 // ReleaseMsg returns msg to pool
-func ReleaseMsg(m *dns.Msg) {
+func ReleaseCacheMsg(m *dns.Msg) {
 	m.Id = 0
 	m.Response = false
 	m.Opcode = 0

@@ -32,6 +32,7 @@ func Test_AllAPICalls(t *testing.T) {
 	middleware.Setup(cfg)
 
 	blocklist := middleware.Get("blocklist").(*blocklist.BlockList)
+
 	blocklist.Set("test.com")
 
 	a := New(&config.Config{API: ":11111"})

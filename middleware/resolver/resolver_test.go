@@ -1,6 +1,7 @@
 package resolver
 
 import (
+	"fmt"
 	"testing"
 
 	"context"
@@ -24,6 +25,7 @@ func Test_resolver(t *testing.T) {
 
 	resp, err := r.Resolve(ctx, req, r.rootservers, true, 30, 0, false, nil)
 
+	fmt.Println(resp.String())
 	assert.NoError(t, err)
 	assert.Equal(t, len(resp.Answer) > 0, true)
 }

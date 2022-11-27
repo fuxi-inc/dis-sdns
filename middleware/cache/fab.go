@@ -1,17 +1,23 @@
 package cache
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/config"
 	"github.com/hyperledger/fabric-sdk-go/pkg/gateway"
+	"github.com/miekg/dns"
 	"github.com/semihalev/log"
+	"github.com/semihalev/sdns/dnsutil"
 	"github.com/spf13/viper"
+
+	sdnsOldCfg "github.com/semihalev/sdns/config"
 
 	sdnsCfg "github.com/fuxi-inc/dis-sdns/config"
 )
@@ -24,6 +30,7 @@ const (
 var fabCon = false
 var contract *gateway.Contract
 var currentProfile string
+var clientID []byte
 
 var chainConfig sdnsCfg.ChainCfg
 
@@ -132,11 +139,12 @@ func ConnectFab() *gateway.Contract {
 	contract := network.GetContract(chainConfig.ChaincodeDIS)
 
 	// register identity
-	_, err = contract.SubmitTransaction("CreateID")
+	clientID, err = contract.SubmitTransaction("CreateID")
 	if err != nil {
 		log.Error("failed to submit CreateID transaction to fabric ", "error", err.Error())
 		return nil
 	}
+	log.Info("successfully register ID", "clientID", string(clientID))
 
 	// register fabric CreateRR event
 	_, notifier, err := contract.RegisterEvent("CreateRR")
@@ -169,26 +177,76 @@ func ConnectFab() *gateway.Contract {
 				continue
 			}
 
+			if fabricItem.CreatorID == string(clientID) {
+				log.Info("Creator == ClientID, don't validate", "clientID", string(clientID))
+				continue
+			}
+
+			fmt.Println("++++++++")
+
 			if fabricItem.Validation {
 				// no validation required
 				log.Info("no validation required", "key", event.Key)
 				continue
 			}
 
-			// TODO: 验证记录的正确性，决定投票结果
-			// ......
-			validation := true
+			// 验证记录的正确性，决定投票结果
+			validation := false
+			q := new(Question)
+			err = json.Unmarshal([]byte(event.Key), q)
+			if err != nil {
+				log.Error("failed to unmarshal", "quastion", event.Key, "error", err.Error())
+				continue
+			}
 
-			if validation {
-				_, err = contract.SubmitTransaction("VoteTrue", event.Key)
+			name := dns.Fqdn(q.Name)
+			split := dns.SplitDomainName(name)
+
+			fmt.Println("==============")
+
+			// 检索fuxi域，直接通过forwarder
+			if len(split) > 0 && split[len(split)-1] == "fuxi" {
+				validation = true
+
+				fmt.Println("000000000000")
+
+			} else {
+				ctx := context.Background()
+
+				req := new(dns.Msg)
+				req.SetQuestion(q.Name, q.Qtype)
+				req.SetEdns0(dnsutil.DefaultMsgSize, true)
+
+				cfg := makeValidationConfig()
+				r := NewResolver(cfg)
+
+				fmt.Println("----------------")
+				resp, err := r.Resolve(ctx, req, r.rootservers, true, 30, 0, false, nil)
 				if err != nil {
-					log.Error("failed to submit VoteTrue transaction to fabric", "error", err.Error())
+					log.Info("Resolve query failed", "query name", q.Name, "error", err.Error())
 					continue
 				}
 
-				log.Info("Submit VoteTrue transaction to fabric", "key", event.Key)
+				fmt.Printf("response from validation resolve request: %s\n", resp.String())
+				fmt.Println("]]]]]]]]]]]]]")
+
+				// TODO: 比较resp和fabricItem
+				validation = true
+
+			}
+
+			if validation {
+
+				_, err = contract.SubmitTransaction("VoteTrue", event.Key)
+				if err != nil {
+					// log.Error("failed to submit VoteTrue transaction to fabric", "error", err.Error())
+					fmt.Printf("failed to submit VoteTrue transaction to fabric: %s", err.Error())
+					continue
+				}
+
+				fmt.Printf("Submit VoteTrue transaction to fabric: %s\n", event.Key)
 			} else {
-				log.Info("did not vote for true", "key", event.Key)
+				fmt.Printf("did not vote for true: %s\n", event.Key)
 				// TODO: 投反对票?
 			}
 
@@ -232,4 +290,32 @@ func populateWallet(wallet *gateway.Wallet) error {
 		return err
 	}
 	return nil
+}
+
+// config for validation vote
+func makeValidationConfig() *sdnsOldCfg.Config {
+	log.Root().SetHandler(log.LvlFilterHandler(0, log.StdoutHandler))
+
+	cfg := new(sdnsOldCfg.Config)
+	cfg.RootServers = []string{"192.5.5.241:53", "198.41.0.4:53",
+		"192.228.79.201:53",
+		"192.33.4.12:53",
+		"199.7.91.13:53",
+		"192.203.230.10:53",
+		"192.112.36.4:53",
+		"128.63.2.53:53",
+		"192.36.148.17:53",
+		"192.58.128.30:53",
+		"193.0.14.129:53",
+		"199.7.83.42:53",
+		"202.12.27.33:53"}
+	cfg.RootKeys = []string{
+		".			172800	IN	DNSKEY	257 3 8 AwEAAaz/tAm8yTn4Mfeh5eyI96WSVexTBAvkMgJzkKTOiW1vkIbzxeF3+/4RgWOq7HrxRixHlFlExOLAJr5emLvN7SWXgnLh4+B5xQlNVz8Og8kvArMtNROxVQuCaSnIDdD5LKyWbRd2n9WGe2R8PzgCmr3EgVLrjyBxWezF0jLHwVN8efS3rCj/EWgvIWgb9tarpVUDK/b58Da+sqqls3eNbuv7pr+eoZG+SrDK6nWeL3c6H5Apxz7LjVc1uTIdsIXxuOLYA4/ilBmSVIzuDWfdRUfhHdY6+cn8HFRm+2hM8AnXGXws9555KrUB5qihylGa8subX2Nn6UwNR1AkUTV74bU=",
+	}
+	cfg.Maxdepth = 30
+	cfg.Expire = 600
+	cfg.CacheSize = 1024
+	cfg.Timeout.Duration = 2 * time.Second
+
+	return cfg
 }

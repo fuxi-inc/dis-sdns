@@ -2,6 +2,7 @@ package resolver
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -48,6 +49,9 @@ func Test_handler(t *testing.T) {
 	handler := middleware.Get("resolver").(*DNSHandler)
 
 	time.Sleep(2 * time.Second)
+
+	fmt.Println(handler.resolver.rootkeys)
+	fmt.Println(handler.cfg.BindDOH)
 
 	assert.Equal(t, "resolver", handler.Name())
 
