@@ -6,6 +6,7 @@ package cache
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -316,6 +317,7 @@ func (w *ResponseWriter) WriteMsg(res *dns.Msg) error {
 		// 并行调用CreateRR
 		go i_new.setRR(string(questionJSON))
 
+		fmt.Printf("submit CreateRR: %s\n", string(questionJSON))
 		log.Info("successfully submit CreateRR to fabric cache", "key", string(questionJSON), "item", i_new)
 
 	} else if duration > 0 {
