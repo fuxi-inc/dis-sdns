@@ -244,7 +244,7 @@ func ConnectFab() *gateway.Contract {
 					continue
 				}
 
-				fmt.Printf(" True transaction to fabric: %s\n", event.Key)
+				fmt.Printf("Successfully Submit VoteTrue transaction to fabric: %s\n", event.Key)
 			} else {
 				fmt.Printf("did not vote for true: %s\n", event.Key)
 				// TODO: 投反对票?
