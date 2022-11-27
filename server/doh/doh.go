@@ -3,7 +3,6 @@ package doh
 import (
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -694,7 +693,6 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 
 			rec := r.URL.Query().Get("identity_identifier")
 
-			fmt.Println("======")
 			log.Info("get access userid", "rec", rec)
 
 			if rec == "" {
