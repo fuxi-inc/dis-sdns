@@ -145,9 +145,12 @@ func (r *Resolver) Resolve(ctx context.Context, req *dns.Msg, servers *authcache
 
 	log.Info("resolve domain req", "length", len(req.Question), "Name", req.Question[0].Name, "Type", req.Question[0].Qtype)
 
+	fmt.Println("test1")
 	if root {
 		servers, parentdsrr, level = r.searchCache(q, req.CheckingDisabled, q.Name)
 	}
+
+	fmt.Println("test2")
 
 	// RFC 7816 query minimization. There are some concerns in RFC.
 	// Current default minimize level 5, if we down to level 3, performance gain 20%
@@ -179,6 +182,8 @@ func (r *Resolver) Resolve(ctx context.Context, req *dns.Msg, servers *authcache
 		return nil, err
 	}
 
+	fmt.Println("test3")
+
 	resp = r.setTags(req, resp)
 
 	if resp.Rcode != dns.RcodeSuccess && len(resp.Answer) == 0 && len(resp.Ns) == 0 {
@@ -202,10 +207,14 @@ func (r *Resolver) Resolve(ctx context.Context, req *dns.Msg, servers *authcache
 		return r.answer(ctx, req, resp, parentdsrr, extra...)
 	}
 
+	fmt.Println("test4")
+
 	if minimized && (len(resp.Answer) == 0 && len(resp.Ns) == 0) || len(resp.Answer) > 0 {
 		level++
 		return r.Resolve(ctx, req, servers, false, depth, level, nomin, parentdsrr)
 	}
+
+	fmt.Println("test5")
 
 	if len(resp.Ns) > 0 {
 		if minimized {
@@ -223,6 +232,8 @@ func (r *Resolver) Resolve(ctx context.Context, req *dns.Msg, servers *authcache
 		}
 
 		var nsrr *dns.NS
+
+		fmt.Println("test6")
 
 		soa := false
 		nss := make(nameservers)
@@ -253,6 +264,8 @@ func (r *Resolver) Resolve(ctx context.Context, req *dns.Msg, servers *authcache
 			}
 			return r.authority(ctx, minReq, resp, parentdsrr, q.Qtype)
 		}
+
+		fmt.Println("test7")
 
 		q = dns.Question{Name: nsrr.Header().Name, Qtype: nsrr.Header().Rrtype, Qclass: nsrr.Header().Class}
 
@@ -303,6 +316,8 @@ func (r *Resolver) Resolve(ctx context.Context, req *dns.Msg, servers *authcache
 			}
 		}
 
+		fmt.Println("test8")
+
 		nlevel := dns.CountLabel(q.Name)
 		if level > nlevel {
 			if r.qnameMinLevel > 0 && !nomin {
@@ -311,6 +326,8 @@ func (r *Resolver) Resolve(ctx context.Context, req *dns.Msg, servers *authcache
 			}
 			return resp, errParentDetection
 		}
+
+		fmt.Println("test9")
 
 		cd := req.CheckingDisabled
 		if len(parentdsrr) == 0 {
@@ -338,6 +355,8 @@ func (r *Resolver) Resolve(ctx context.Context, req *dns.Msg, servers *authcache
 			return r.Resolve(ctx, req, ncache.Servers, false, depth, level, nomin, ncache.DSRR)
 		}
 
+		fmt.Println("test10")
+
 		log.Debug("Nameserver cache not found", "key", key, "query", formatQuestion(q), "cd", cd)
 
 		authservers, foundv4, foundv6 := r.checkGlueRR(resp, nss, level)
@@ -355,6 +374,8 @@ func (r *Resolver) Resolve(ctx context.Context, req *dns.Msg, servers *authcache
 			return nil, errors.New("nameservers are unreachable")
 		}
 
+		fmt.Println("test11")
+
 		r.ncache.Set(key, parentdsrr, authservers, time.Duration(nsrr.Header().Ttl)*time.Second)
 		log.Debug("Nameserver cache insert", "key", key, "query", formatQuestion(q), "cd", cd)
 
@@ -369,6 +390,7 @@ func (r *Resolver) Resolve(ctx context.Context, req *dns.Msg, servers *authcache
 		if depth <= 0 {
 			return nil, errMaxDepth
 		}
+		fmt.Println("test12")
 
 		return r.Resolve(ctx, req, authservers, false, depth, nlevel, nomin, parentdsrr)
 	}
