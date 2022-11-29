@@ -5,11 +5,12 @@ replace github.com/go-kit/kit => github.com/go-kit/kit v0.8.0
 require (
 	github.com/BurntSushi/toml v1.0.0
 	github.com/cespare/xxhash/v2 v2.1.2
+	github.com/domainr/dnsr v0.0.0-20221116082105-3a5febb6e20f
 	github.com/gin-contrib/cors v1.3.1
 	github.com/gin-contrib/pprof v1.3.0
 	github.com/gin-gonic/gin v1.7.7
 	github.com/hyperledger/fabric-sdk-go v1.0.0
-	github.com/miekg/dns v1.1.34
+	github.com/miekg/dns v1.1.50
 	github.com/prometheus/client_golang v1.12.1
 	github.com/semihalev/log v0.1.1
 	github.com/spf13/viper v1.7.0

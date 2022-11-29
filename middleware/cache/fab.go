@@ -1,7 +1,6 @@
 package cache
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,11 +9,11 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/domainr/dnsr"
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/config"
 	"github.com/hyperledger/fabric-sdk-go/pkg/gateway"
 	"github.com/miekg/dns"
 	"github.com/semihalev/log"
-	"github.com/semihalev/sdns/dnsutil"
 	"github.com/spf13/viper"
 
 	sdnsCfg "github.com/semihalev/sdns/config"
@@ -31,6 +30,8 @@ var currentProfile string
 var clientID []byte
 
 var chainConfig sdnsCfg.ChainCfg
+
+var validation_resolver = dnsr.New(0)
 
 // fabric key for RR
 type Question struct {
@@ -180,8 +181,6 @@ func ConnectFab() *gateway.Contract {
 				continue
 			}
 
-			fmt.Println("++++++++")
-
 			if fabricItem.Validation {
 				// no validation required
 				log.Info("no validation required", "key", event.Key)
@@ -190,6 +189,7 @@ func ConnectFab() *gateway.Contract {
 
 			// 验证记录的正确性，决定投票结果
 			validation := false
+
 			q := new(Question)
 			err = json.Unmarshal([]byte(event.Key), q)
 			if err != nil {
@@ -200,33 +200,34 @@ func ConnectFab() *gateway.Contract {
 			name := dns.Fqdn(q.Name)
 			split := dns.SplitDomainName(name)
 
-			fmt.Println("==============")
-
 			// 检索fuxi域，直接通过forwarder
 			if len(split) > 0 && split[len(split)-1] == "fuxi" {
 				validation = true
-
-				fmt.Println("000000000000")
-
 			} else {
-				ctx := context.Background()
+				// ctx := context.Background()
 
-				req := new(dns.Msg)
-				req.SetQuestion(q.Name, q.Qtype)
-				req.SetEdns0(dnsutil.DefaultMsgSize, true)
+				// req := new(dns.Msg)
+				// req.SetQuestion(q.Name, q.Qtype)
+				// req.SetEdns0(dnsutil.DefaultMsgSize, true)
 
-				cfg := makeValidationConfig()
-				r := NewResolver(cfg)
+				// cfg := makeValidationConfig()
+				// r := NewResolver(cfg)
 
-				fmt.Println("----------------")
-				resp, err := r.Resolve(ctx, req, r.rootservers, true, 30, 0, false, nil)
-				if err != nil {
-					log.Info("Resolve query failed", "query name", q.Name, "error", err.Error())
-					continue
+				// fmt.Println("----------------")
+				// resp, err := r.Resolve(ctx, req, r.rootservers, true, 30, 0, false, nil)
+				// if err != nil {
+				// 	log.Info("Resolve query failed", "query name", q.Name, "error", err.Error())
+				// 	continue
+				// }
+
+				// fmt.Printf("response from validation resolve request: %s\n", resp.String())
+				// fmt.Println("]]]]]]]]]]]]]")
+
+				qtype := dns.TypeToString[q.Qtype]
+
+				for _, rr := range validation_resolver.Resolve(name, qtype) {
+					fmt.Println(rr.String())
 				}
-
-				fmt.Printf("response from validation resolve request: %s\n", resp.String())
-				fmt.Println("]]]]]]]]]]]]]")
 
 				// TODO: 比较resp和fabricItem
 				validation = true

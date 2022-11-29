@@ -156,14 +156,19 @@ func (r *Resolver) Resolve(ctx context.Context, req *dns.Msg, servers *authcache
 	// Current default minimize level 5, if we down to level 3, performance gain 20%
 	minReq, minimized := r.minimize(req, level, nomin)
 
+	fmt.Println("test2.1")
 	log.Debug("Query inserted", "reqid", minReq.Id, "zone", servers.Zone, "query", formatQuestion(minReq.Question[0]), "cd", req.CheckingDisabled, "qname-minimize", minimized)
 
 	resp, err := r.groupLookup(ctx, minReq, servers)
+
+	fmt.Println("test2.2")
 	if err != nil {
 		if minimized {
 			// return without minimized
 			return r.Resolve(ctx, req, servers, false, depth, level, true, parentdsrr, extra...)
 		}
+
+		fmt.Println("test2.3")
 
 		if _, ok := err.(fatalError); ok {
 			// no check for nsaddrs lookups
@@ -171,13 +176,19 @@ func (r *Resolver) Resolve(ctx context.Context, req *dns.Msg, servers *authcache
 				return nil, err
 			}
 
+			fmt.Println("test2.4")
 			log.Debug("Received network error from all servers", "query", formatQuestion(minReq.Question[0]))
 
 			if atomic.AddUint32(&servers.ErrorCount, 1) == 5 {
 				if ok := r.checkNss(ctx, servers); ok {
+
+					fmt.Println("test2.5")
 					return r.Resolve(ctx, req, servers, root, depth, level, nomin, parentdsrr, extra...)
+
 				}
+
 			}
+
 		}
 		return nil, err
 	}
@@ -275,10 +286,15 @@ func (r *Resolver) Resolve(ctx context.Context, req *dns.Msg, servers *authcache
 
 			return nil, errDSRecords
 		}
+
+		fmt.Println("test7.1")
+
 		parentdsrr, err = r.findDS(ctx, signer, q.Name, resp, parentdsrr)
 		if err != nil {
 			return nil, err
 		}
+
+		fmt.Println("test7.2")
 
 		if !signerFound && len(parentdsrr) > 0 {
 			err = errDSRecords
@@ -294,7 +310,11 @@ func (r *Resolver) Resolve(ctx context.Context, req *dns.Msg, servers *authcache
 				}
 			}
 
+			fmt.Println("test7.3")
+
 			parentdsrr = extractRRSet(resp.Ns, nsrr.Header().Name, dns.TypeDS)
+
+			fmt.Println("test7.4")
 
 			nsec3Set := extractRRSet(resp.Ns, "", dns.TypeNSEC3)
 			if len(nsec3Set) > 0 {
@@ -304,6 +324,8 @@ func (r *Resolver) Resolve(ctx context.Context, req *dns.Msg, servers *authcache
 					return nil, err
 				}
 				parentdsrr = []dns.RR{}
+
+				fmt.Println("test7.5")
 			} else {
 				nsecSet := extractRRSet(resp.Ns, nsrr.Header().Name, dns.TypeNSEC)
 				if len(nsecSet) > 0 {
@@ -312,7 +334,11 @@ func (r *Resolver) Resolve(ctx context.Context, req *dns.Msg, servers *authcache
 						return nil, fmt.Errorf("NSEC verify failed")
 					}
 					parentdsrr = []dns.RR{}
+
+					fmt.Println("test7.6")
 				}
+
+				fmt.Println("test7.7")
 			}
 		}
 
