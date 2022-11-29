@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/domainr/dnsr"
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/config"
@@ -204,27 +203,9 @@ func ConnectFab() *gateway.Contract {
 			if len(split) > 0 && split[len(split)-1] == "fuxi" {
 				validation = true
 			} else {
-				// ctx := context.Background()
-
-				// req := new(dns.Msg)
-				// req.SetQuestion(q.Name, q.Qtype)
-				// req.SetEdns0(dnsutil.DefaultMsgSize, true)
-
-				// cfg := makeValidationConfig()
-				// r := NewResolver(cfg)
-
-				// fmt.Println("----------------")
-				// resp, err := r.Resolve(ctx, req, r.rootservers, true, 30, 0, false, nil)
-				// if err != nil {
-				// 	log.Info("Resolve query failed", "query name", q.Name, "error", err.Error())
-				// 	continue
-				// }
-
-				// fmt.Printf("response from validation resolve request: %s\n", resp.String())
-				// fmt.Println("]]]]]]]]]]]]]")
-
 				qtype := dns.TypeToString[q.Qtype]
 
+				fmt.Printf("validation resolve req: %s, %s\n", name, qtype)
 				for _, rr := range validation_resolver.Resolve(name, qtype) {
 					fmt.Println(rr.String())
 				}
@@ -289,32 +270,4 @@ func populateWallet(wallet *gateway.Wallet) error {
 		return err
 	}
 	return nil
-}
-
-// config for validation vote
-func makeValidationConfig() *sdnsCfg.Config {
-	log.Root().SetHandler(log.LvlFilterHandler(0, log.StdoutHandler))
-
-	cfg := new(sdnsCfg.Config)
-	cfg.RootServers = []string{"192.5.5.241:53", "198.41.0.4:53",
-		"192.228.79.201:53",
-		"192.33.4.12:53",
-		"199.7.91.13:53",
-		"192.203.230.10:53",
-		"192.112.36.4:53",
-		"128.63.2.53:53",
-		"192.36.148.17:53",
-		"192.58.128.30:53",
-		"193.0.14.129:53",
-		"199.7.83.42:53",
-		"202.12.27.33:53"}
-	cfg.RootKeys = []string{
-		".			172800	IN	DNSKEY	257 3 8 AwEAAaz/tAm8yTn4Mfeh5eyI96WSVexTBAvkMgJzkKTOiW1vkIbzxeF3+/4RgWOq7HrxRixHlFlExOLAJr5emLvN7SWXgnLh4+B5xQlNVz8Og8kvArMtNROxVQuCaSnIDdD5LKyWbRd2n9WGe2R8PzgCmr3EgVLrjyBxWezF0jLHwVN8efS3rCj/EWgvIWgb9tarpVUDK/b58Da+sqqls3eNbuv7pr+eoZG+SrDK6nWeL3c6H5Apxz7LjVc1uTIdsIXxuOLYA4/ilBmSVIzuDWfdRUfhHdY6+cn8HFRm+2hM8AnXGXws9555KrUB5qihylGa8subX2Nn6UwNR1AkUTV74bU=",
-	}
-	cfg.Maxdepth = 30
-	cfg.Expire = 600
-	cfg.CacheSize = 0
-	cfg.Timeout.Duration = 2 * time.Second
-
-	return cfg
 }
