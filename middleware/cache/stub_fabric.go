@@ -24,13 +24,20 @@ const (
 )
 
 var fabCon = false
-var contract *gateway.Contract
+
+// var contract *gateway.Contract
 var currentProfile string
 var clientID []byte
 
 var chainConfig sdnsCfg.ChainCfg
 
 var validation_resolver = dnsr.New(0)
+
+type FabricService struct {
+	Gateway  *gateway.Gateway
+	Network  *gateway.Network
+	Contract *gateway.Contract
+}
 
 // fabric key for RR
 type Question struct {
@@ -45,56 +52,22 @@ type Event struct {
 	Item string `json:"item"`
 }
 
-// var credPath = filepath.Join(
-// 	"/home",
-// 	"fuxi",
-// 	"fabric-samples",
-// 	"test-network",
-// 	"organizations",
-// 	"peerOrganizations",
-// 	"org1.example.com",
-// 	"users",
-// 	"User1@org1.example.com",
-// 	"msp",
-// )
+func (f *FabricService) getType() string {
+	return "Fabric"
+}
 
-// var ccpPath = filepath.Join(
-// 	"/home",
-// 	"fuxi",
-// 	"fabric-samples",
-// 	"test-network",
-// 	"organizations",
-// 	"peerOrganizations",
-// 	"org1.example.com",
-// 	"connection-org1.yaml",
-// )
+func (f *FabricService) Call(name string, args ...string) ([]byte, error) {
+	response, err := f.Contract.EvaluateTransaction(name, args...)
+	return response, err
+}
 
-func ReadChainCfg() sdnsCfg.ChainCfg {
-	v := viper.New()
-
-	currentProfile = os.Getenv("APP_PROFILE")
-	if currentProfile == "" {
-		currentProfile = DefaultProfile
-	}
-
-	v.AutomaticEnv()
-	v.SetConfigName("application")
-	v.AddConfigPath(filepath.Join("config", currentProfile))
-	err := v.ReadInConfig()
-	if err != nil {
-		log.Crit("failed to load chain config file", "error", err.Error())
-	}
-
-	err = v.Unmarshal(&chainConfig)
-	if err != nil {
-		log.Crit("failed to unmarshal chain config", "error", err.Error())
-	}
-
-	return chainConfig
+func (f *FabricService) SendTransaction(name string, args ...string) ([]byte, error) {
+	response, err := f.Contract.SubmitTransaction(name, args...)
+	return response, err
 }
 
 // 连接Fabric，返回*gateway.Contract
-func ConnectFab() *gateway.Contract {
+func (f *FabricService) LoadConfig(confs ...string) error {
 
 	os.Setenv("DISCOVERY_AS_LOCALHOST", "true")
 
@@ -203,12 +176,14 @@ func ConnectFab() *gateway.Contract {
 			if len(split) > 0 && split[len(split)-1] == "fuxi" {
 				validation = true
 			} else {
-				qtype := dns.TypeToString[q.Qtype]
 
-				fmt.Printf("validation resolve req: %s, %s\n", name, qtype)
-				for _, rr := range validation_resolver.Resolve(name, qtype) {
-					fmt.Println(rr.String())
-				}
+				// TODO: resolve validation
+				// qtype := dns.TypeToString[q.Qtype]
+
+				// fmt.Printf("validation resolve req: %s, %s\n", name, qtype)
+				// for _, rr := range validation_resolver.Resolve(name, qtype) {
+				// 	// fmt.Println(rr.String())
+				// }
 
 				// TODO: 比较resp和fabricItem
 				validation = true
@@ -233,7 +208,11 @@ func ConnectFab() *gateway.Contract {
 		}
 	}()
 
-	return contract
+	f.Gateway = gw
+	f.Network = network
+	f.Contract = contract
+
+	return nil
 }
 
 // 创建钱包用户resUser
@@ -270,4 +249,28 @@ func populateWallet(wallet *gateway.Wallet) error {
 		return err
 	}
 	return nil
+}
+
+func ReadChainCfg() sdnsCfg.ChainCfg {
+	v := viper.New()
+
+	currentProfile = os.Getenv("APP_PROFILE")
+	if currentProfile == "" {
+		currentProfile = DefaultProfile
+	}
+
+	v.AutomaticEnv()
+	v.SetConfigName("application")
+	v.AddConfigPath(filepath.Join("config", currentProfile))
+	err := v.ReadInConfig()
+	if err != nil {
+		log.Crit("failed to load chain config file", "error", err.Error())
+	}
+
+	err = v.Unmarshal(&chainConfig)
+	if err != nil {
+		log.Crit("failed to unmarshal chain config", "error", err.Error())
+	}
+
+	return chainConfig
 }

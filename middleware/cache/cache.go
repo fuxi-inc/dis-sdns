@@ -6,7 +6,6 @@ package cache
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -54,12 +53,9 @@ type ResponseWriter struct {
 	*Cache
 }
 
-// var fabCon = true
 var debugns bool
 
-// var validation_account = chainConfig.Validation_account
-
-// var contract *client.Contract
+var service ChainService
 
 func init() {
 	middleware.Register(name, func(cfg *config.Config) middleware.Handler {
@@ -68,8 +64,8 @@ func init() {
 
 	_, debugns = os.LookupEnv("SDNS_DEBUGNS")
 
-	contract = ConnectFab()
-	if contract == nil {
+	service, _ = NewChainService(ChainTypeFabric, "")
+	if service == nil {
 		log.Info("cannot connect fabric contract, use traditional cache instead")
 		fabCon = false
 	} else {
@@ -181,7 +177,7 @@ func (c *Cache) ServeDNS(ctx context.Context, ch *middleware.Chain) {
 			log.Info("fabric cache receive a dns msg", "qname", q.Name, "qtype", q.Qtype, "question", string(questionJSON))
 
 			// 调用queryRR合约查询资源记录
-			result, err := contract.EvaluateTransaction("queryRR", string(questionJSON))
+			result, err := service.Call("queryRR", string(questionJSON))
 			if err == nil {
 
 				err = json.Unmarshal(result, i_new)
@@ -317,7 +313,7 @@ func (w *ResponseWriter) WriteMsg(res *dns.Msg) error {
 		// 并行调用CreateRR
 		go i_new.setRR(string(questionJSON))
 
-		fmt.Printf("submit CreateRR: %s\n", string(questionJSON))
+		// fmt.Printf("submit CreateRR: %s\n", string(questionJSON))
 		log.Info("successfully submit CreateRR to fabric cache", "key", string(questionJSON), "item", i_new)
 
 	} else if duration > 0 {
@@ -337,7 +333,7 @@ func (i *FabricItem) setRR(key string) {
 	}
 
 	log.Info("validation account test", strconv.Itoa(chainConfig.Validation_account))
-	_, err = contract.SubmitTransaction("CreateRR", key, string(itemAsBytes), strconv.Itoa(chainConfig.Validation_account))
+	_, err = service.SendTransaction("CreateRR", key, string(itemAsBytes), strconv.Itoa(chainConfig.Validation_account))
 	if err != nil {
 		log.Info("failed to submit CreateRR transaction to fabric ")
 	}
