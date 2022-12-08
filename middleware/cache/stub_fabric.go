@@ -78,14 +78,14 @@ func (f *FabricService) LoadConfig(confs ...string) error {
 	wallet, err := gateway.NewFileSystemWallet("wallet")
 	if err != nil {
 		log.Error("failed to create wallet", "error", err.Error())
-		return nil
+		return err
 	}
 
 	if !wallet.Exists(chainConfig.UserName) {
 		err = populateWallet(wallet)
 		if err != nil {
 			log.Error("failed to populate wallet contents", "error", err.Error())
-			return nil
+			return err
 		}
 	}
 
@@ -97,14 +97,14 @@ func (f *FabricService) LoadConfig(confs ...string) error {
 	)
 	if err != nil {
 		log.Error("failed to connect to gateway", "error", err.Error())
-		return nil
+		return err
 	}
 
 	log.Info("channel", chainConfig.Channel)
 	network, err := gw.GetNetwork(chainConfig.Channel)
 	if err != nil {
 		log.Error("failed to get network", "error", err.Error())
-		return nil
+		return err
 	}
 
 	contract := network.GetContract(chainConfig.ChaincodeDIS)
@@ -113,7 +113,7 @@ func (f *FabricService) LoadConfig(confs ...string) error {
 	clientID, err = contract.SubmitTransaction("CreateID")
 	if err != nil {
 		log.Error("failed to submit CreateID transaction to fabric ", "error", err.Error())
-		return nil
+		return err
 	}
 	log.Info("successfully register ID", "clientID", string(clientID))
 
@@ -121,7 +121,7 @@ func (f *FabricService) LoadConfig(confs ...string) error {
 	_, notifier, err := contract.RegisterEvent("CreateRR")
 	if err != nil {
 		fmt.Printf("Failed to register contract event: %s", err)
-		return nil
+		return err
 	}
 	// defer contract.Unregister(reg)
 

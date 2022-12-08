@@ -64,8 +64,8 @@ func init() {
 
 	_, debugns = os.LookupEnv("SDNS_DEBUGNS")
 
-	service, _ = NewChainService(ChainTypeFabric, "")
-	if service == nil {
+	service, err := NewChainService(ChainTypeFabric, "")
+	if service == nil || err != nil {
 		log.Info("cannot connect fabric contract, use traditional cache instead")
 		fabCon = false
 	} else {

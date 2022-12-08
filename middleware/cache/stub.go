@@ -1,5 +1,7 @@
 package cache
 
+import "errors"
+
 type ChainService interface {
 	//获取区块链类型
 	getType() string
@@ -34,8 +36,8 @@ func NewChainService(chaintype string, confs ...string) (ChainService, error) {
 	var srv ChainService
 	if chaintype == ChainTypeFabric {
 		srv = new(FabricService)
-		srv.LoadConfig(confs...)
-		return srv, nil
+		err := srv.LoadConfig(confs...)
+		return srv, err
 	}
-	return nil, nil
+	return nil, errors.New("no chain service")
 }
