@@ -57,8 +57,8 @@ func (h *DNSHandler) ServeDNS(ctx context.Context, ch *middleware.Chain) {
 	name := dns.Fqdn(q.Name)
 	split := dns.SplitDomainName(name)
 
-	// 检索fuxi域，直接通过forwarder
-	if len(split) > 0 && split[len(split)-1] == "fuxi" {
+	// 检索dis域，直接通过forwarder
+	if len(split) > 0 && split[len(split)-2] == "data" && split[len(split)-2] == "user" {
 		ch.Next(ctx)
 		return
 	}
