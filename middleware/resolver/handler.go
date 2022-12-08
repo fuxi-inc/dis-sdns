@@ -58,7 +58,7 @@ func (h *DNSHandler) ServeDNS(ctx context.Context, ch *middleware.Chain) {
 	split := dns.SplitDomainName(name)
 
 	// 检索dis域，直接通过forwarder
-	if len(split) > 0 && (split[len(split)-2] == "data" || split[len(split)-2] == "user") {
+	if len(split) > 1 && (split[len(split)-2] == "data" || split[len(split)-2] == "user") {
 		log.Info("forwarding req", "name", name)
 		ch.Next(ctx)
 		return
