@@ -799,6 +799,47 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 
 			owner := tmp2[0]
 
+			// 获取strategy数据标识，如果permission为public，直接返回true
+			st_dataid := "_strategy." + stid
+
+			qtype = dns.TypeTXT
+
+			req = new(dns.Msg)
+			req.SetQuestion(st_dataid, qtype)
+
+			msg = handle(req)
+			if msg == nil {
+				// 失败：解析授权TXT记录时，DNS解析无结果
+				json, _ := json.Marshal(errmsg.DomainResolutionError)
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write(json)
+
+				log.Info("failed to handle the request: strategy data TXT", "req", req)
+				return
+			}
+
+			if len(msg.Answer) != 0 {
+				a := msg.Answer[0]
+				tmp := strings.TrimPrefix(a.String(), a.Header().String())
+				if tmp != "" {
+					if strings.Contains(tmp, "public") {
+						var maps = make(map[string]interface{})
+						maps["authorization_info"] = "true"
+
+						json, err := json.Marshal(errmsg.OK.WithData(maps))
+						if err != nil {
+							http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+							return
+						}
+
+						_, _ = w.Write(json)
+
+						return
+					}
+				}
+
+			}
+
 			// 获取pod所有者公钥
 			qtype = dns.TypeCERT
 
