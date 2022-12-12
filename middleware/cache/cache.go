@@ -6,6 +6,7 @@ package cache
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -44,6 +45,8 @@ type Cache struct {
 
 	// Testing.
 	now func() time.Time
+
+	service ChainService
 }
 
 // ResponseWriter implement of ctx.ResponseWriter
@@ -55,7 +58,7 @@ type ResponseWriter struct {
 
 var debugns bool
 
-var service ChainService
+// var Service ChainService
 
 func init() {
 	middleware.Register(name, func(cfg *config.Config) middleware.Handler {
@@ -64,13 +67,18 @@ func init() {
 
 	_, debugns = os.LookupEnv("SDNS_DEBUGNS")
 
-	service, err := NewChainService(ChainTypeFabric, "")
-	if service == nil || err != nil {
-		log.Info("cannot connect fabric contract, use traditional cache instead")
-		fabCon = false
-	} else {
-		log.Info("cache successfully connect to fabric contract")
-	}
+	// Service, err := NewChainService(ChainTypeFabric, "")
+	// if Service == nil || err != nil {
+	// 	log.Info("cannot connect fabric contract, use traditional cache instead")
+	// 	fabCon = false
+	// } else {
+	// 	log.Info("cache successfully connect to fabric contract")
+	// }
+
+	// fmt.Println(Service)
+	// // testing fabric
+	// result, err := Service.Call("queryRR", "a")
+	// log.Info("Testing result", "response", string(result), "err", err.Error())
 
 }
 
@@ -79,6 +87,16 @@ func New(cfg *config.Config) *Cache {
 	if cfg.CacheSize < 1024 {
 		cfg.CacheSize = 1024
 	}
+
+	srv, err := NewChainService(ChainTypeFabric, "")
+	if srv == nil || err != nil {
+		log.Info("cannot connect fabric contract, use traditional cache instead")
+		fabCon = false
+	} else {
+		log.Info("cache successfully connect to fabric contract")
+	}
+
+	fmt.Println(srv)
 
 	c := &Cache{
 		pcap:    cfg.CacheSize / 2,
@@ -96,7 +114,13 @@ func New(cfg *config.Config) *Cache {
 		wg: waitgroup.New(15 * time.Second),
 
 		now: time.Now,
+
+		service: srv,
 	}
+
+	// testing fabric
+	result, _ := c.service.Call("queryRR", "a")
+	log.Info("Testing result", "response", string(result))
 
 	return c
 }
@@ -166,6 +190,7 @@ func (c *Cache) ServeDNS(ctx context.Context, ch *middleware.Chain) {
 	if err != nil {
 		return
 	}
+	fmt.Println(string(questionJSON))
 
 	i, found := c.get(hashq, now)
 	if found && i != nil {
@@ -177,7 +202,7 @@ func (c *Cache) ServeDNS(ctx context.Context, ch *middleware.Chain) {
 			log.Info("fabric cache receive a dns msg", "qname", q.Name, "qtype", q.Qtype, "question", string(questionJSON))
 
 			// 调用queryRR合约查询资源记录
-			result, err := service.Call("queryRR", string(questionJSON))
+			result, err := c.service.Call("queryRR", string(questionJSON))
 			if err == nil {
 
 				err = json.Unmarshal(result, i_new)
@@ -311,7 +336,7 @@ func (w *ResponseWriter) WriteMsg(res *dns.Msg) error {
 		i_new := transToFabricItem(i)
 
 		// 并行调用CreateRR
-		go i_new.setRR(string(questionJSON))
+		go i_new.setRR(string(questionJSON), w.service)
 
 		// fmt.Printf("submit CreateRR: %s\n", string(questionJSON))
 		log.Info("successfully submit CreateRR to fabric cache", "key", string(questionJSON), "item", i_new)
@@ -326,14 +351,14 @@ func (w *ResponseWriter) WriteMsg(res *dns.Msg) error {
 	return w.ResponseWriter.WriteMsg(res)
 }
 
-func (i *FabricItem) setRR(key string) {
+func (i *FabricItem) setRR(key string, srv ChainService) {
 	itemAsBytes, err := json.Marshal(i)
 	if err != nil {
 		log.Error("failed to set RR in fabric cache : failed to marshal", "error", err.Error())
 	}
 
 	log.Info("validation account test", strconv.Itoa(chainConfig.Validation_account))
-	_, err = service.SendTransaction("CreateRR", key, string(itemAsBytes), strconv.Itoa(chainConfig.Validation_account))
+	_, err = srv.SendTransaction("CreateRR", key, string(itemAsBytes), strconv.Itoa(chainConfig.Validation_account))
 	if err != nil {
 		log.Info("failed to submit CreateRR transaction to fabric ")
 	}

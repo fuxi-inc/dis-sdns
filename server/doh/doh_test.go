@@ -211,8 +211,8 @@ func Test_disAuth(t *testing.T) {
 	// 授权验证
 	w := httptest.NewRecorder()
 
-	userid := "LWJWUCI3YCQFZKUUPSSV7SQG6ZAPLLOLCVQYKOO76FUBVPAC36LA===="
-	dataid := "3e542bdf-b330-489e-aaa1-609b6d3ef704.data.fuxi."
+	// userid := "LWJWUCI3YCQFZKUUPSSV7SQG6ZAPLLOLCVQYKOO76FUBVPAC36LA===="
+	// dataid := "3e542bdf-b330-489e-aaa1-609b6d3ef704.data.fuxi."
 
 	// cred, err := loadUserCredentials("../../test/userb.yaml")
 	// assert.NoError(t, err)
@@ -220,26 +220,26 @@ func Test_disAuth(t *testing.T) {
 	// accPrivKey, _, err := fetchKeyPair(cred)
 	// assert.NoError(t, err)
 
-	cred, err := loadUserCredentials("../../test/fuyufantest.user.fuxi.yaml")
-	assert.NoError(t, err)
+	// cred, err := loadUserCredentials("../../test/fuyufantest.user.fuxi.yaml")
+	// assert.NoError(t, err)
 
-	podPrivKey, _, err := fetchKeyPair(cred)
-	assert.NoError(t, err)
+	// podPrivKey, _, err := fetchKeyPair(cred)
+	// assert.NoError(t, err)
 
-	podSignature, err := sign(podPrivKey, hash([]byte(dataid+userid)))
-	assert.NoError(t, err)
+	// podSignature, err := sign(podPrivKey, hash([]byte(dataid+userid)))
+	// assert.NoError(t, err)
 
 	// accSignature, err := sign(accPrivKey, hash([]byte(dataid+userid)))
 	// assert.NoError(t, err)
 
 	// log.Info("accSignature", base64.StdEncoding.EncodeToString(accSignature))
-	log.Info("podSignature", base64.StdEncoding.EncodeToString(podSignature))
+	// log.Info("podSignature", base64.StdEncoding.EncodeToString(podSignature))
 
-	request, err := http.NewRequest("GET", "/dis-query/authorization/authentication?identity_identifier=LWJWUCI3YCQFZKUUPSSV7SQG6ZAPLLOLCVQYKOO76FUBVPAC36LA====&data_identifier=3e542bdf-b330-489e-aaa1-609b6d3ef704.data.fuxi.", nil)
+	request, err := http.NewRequest("GET", "/dis-query/authorization/authentication?identity_identifier=uTahrtp2OlS78hVxdM3GcPd1Z/AI2ELJLhe04JAZn8w=&data_identifier=fcb70ba0-6b9f-11ed-aef6-63114a05a8a0.data.fuxi.", nil)
 	assert.NoError(t, err)
 
 	request.RemoteAddr = "127.0.0.1:0"
-	request.Header.Set("Authorization", "Bearer "+base64.StdEncoding.EncodeToString(podSignature))
+	// request.Header.Set("Authorization", "Bearer "+base64.StdEncoding.EncodeToString(podSignature))
 
 	handleDISTest(w, request)
 
