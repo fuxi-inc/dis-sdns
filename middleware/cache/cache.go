@@ -118,10 +118,6 @@ func New(cfg *config.Config) *Cache {
 		service: srv,
 	}
 
-	// testing fabric
-	result, _ := c.service.Call("queryRR", "a")
-	log.Info("Testing result", "response", string(result))
-
 	return c
 }
 
