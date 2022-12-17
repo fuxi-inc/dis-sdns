@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/domainr/dnsr"
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/config"
 	"github.com/hyperledger/fabric-sdk-go/pkg/gateway"
 	"github.com/miekg/dns"
@@ -31,7 +30,7 @@ var clientID []byte
 
 var chainConfig sdnsCfg.ChainCfg
 
-var validation_resolver = dnsr.New(0)
+// var validation_resolver = dnsr.New(0)
 
 type FabricService struct {
 	Gateway  *gateway.Gateway
