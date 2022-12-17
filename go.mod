@@ -21,4 +21,6 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
 
+replace github.com/miekg/dns v1.1.50 => github.com/fuxi-inc/miekg-dns v1.0.0
+
 go 1.13

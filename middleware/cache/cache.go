@@ -5,15 +5,11 @@ package cache
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/semihalev/log"
 	"github.com/semihalev/sdns/middleware"
 	"github.com/semihalev/sdns/waitgroup"
 	"golang.org/x/time/rate"
@@ -45,8 +41,6 @@ type Cache struct {
 
 	// Testing.
 	now func() time.Time
-
-	service ChainService
 }
 
 // ResponseWriter implement of ctx.ResponseWriter
@@ -58,28 +52,12 @@ type ResponseWriter struct {
 
 var debugns bool
 
-// var Service ChainService
-
 func init() {
 	middleware.Register(name, func(cfg *config.Config) middleware.Handler {
 		return New(cfg)
 	})
 
 	_, debugns = os.LookupEnv("SDNS_DEBUGNS")
-
-	// Service, err := NewChainService(ChainTypeFabric, "")
-	// if Service == nil || err != nil {
-	// 	log.Info("cannot connect fabric contract, use traditional cache instead")
-	// 	fabCon = false
-	// } else {
-	// 	log.Info("cache successfully connect to fabric contract")
-	// }
-
-	// fmt.Println(Service)
-	// // testing fabric
-	// result, err := Service.Call("queryRR", "a")
-	// log.Info("Testing result", "response", string(result), "err", err.Error())
-
 }
 
 // New return cache
@@ -87,16 +65,6 @@ func New(cfg *config.Config) *Cache {
 	if cfg.CacheSize < 1024 {
 		cfg.CacheSize = 1024
 	}
-
-	srv, err := NewChainService(ChainTypeFabric, "")
-	if srv == nil || err != nil {
-		log.Info("cannot connect fabric contract, use traditional cache instead")
-		fabCon = false
-	} else {
-		log.Info("cache successfully connect to fabric contract")
-	}
-
-	fmt.Println(srv)
 
 	c := &Cache{
 		pcap:    cfg.CacheSize / 2,
@@ -114,8 +82,6 @@ func New(cfg *config.Config) *Cache {
 		wg: waitgroup.New(15 * time.Second),
 
 		now: time.Now,
-
-		service: srv,
 	}
 
 	return c
@@ -168,76 +134,7 @@ func (c *Cache) ServeDNS(ctx context.Context, ch *middleware.Chain) {
 
 	now := c.now().UTC()
 
-	hashq := cache.Hash(q, req.CheckingDisabled)
-	// i := new(item)
-
-	i_new := new(FabricItem)
-
-	// 标记是否在cache中找到item
-	found := false
-
-	// 构造fabric key
-	question := Question{
-		Name:   q.Name,
-		Qtype:  q.Qtype,
-		Qclass: q.Qclass,
-	}
-	questionJSON, err := json.Marshal(question)
-	if err != nil {
-		return
-	}
-	fmt.Println(string(questionJSON))
-
-	i, found := c.get(hashq, now)
-	if found && i != nil {
-		log.Info("get result from local cache", "qname", q.Name, "qtype", q.Qtype, "hashq", hashq)
-	}
-
-	if i == nil || !found {
-		if fabCon {
-			log.Info("fabric cache receive a dns msg", "qname", q.Name, "qtype", q.Qtype, "question", string(questionJSON))
-
-			// 调用queryRR合约查询资源记录
-			result, err := c.service.Call("queryRR", string(questionJSON))
-			if err == nil {
-
-				err = json.Unmarshal(result, i_new)
-				if err != nil {
-					log.Error("failed to unmarshal", "error", err.Error())
-				}
-				found = true
-
-				i = transItem(i_new)
-
-				ttl := i.ttl(now)
-
-				log.Info("successfully get and transform result from fabric cache", "question", string(questionJSON), "remainTTL", ttl, "item", i_new)
-
-				// 判断validation是否有效
-				if !i_new.Validation {
-					found = false
-					log.Info("RR from the fabric cache has not been validated", "question", string(questionJSON))
-				}
-
-				// 判断TTL是否到期
-				if ttl <= 0 {
-					found = false
-					log.Info("RR from the fabric cache expired in TTL", "remainTTL", ttl)
-				}
-
-				// 写入local cache
-				if found {
-					c.pcache.Add(hashq, i)
-					log.Info("successfully add to local cache", "key", hashq)
-				}
-
-			} else {
-				// fabric cache上未查到
-				log.Info("failed to find the RR from the fabric cache", "question", string(questionJSON), "error", err.Error())
-			}
-		}
-	}
-
+	i, found := c.get(cache.Hash(q, req.CheckingDisabled), now)
 	if i != nil && found {
 		if !w.Internal() && c.rate > 0 && !i.Limiter.Allow() {
 			//no reply to client
@@ -315,50 +212,13 @@ func (w *ResponseWriter) WriteMsg(res *dns.Msg) error {
 		duration = computeTTL(msgTTL, w.minpttl, w.pttl)
 	}
 
-	// 构造fabric key
-	question := Question{
-		Name:   q.Name,
-		Qtype:  q.Qtype,
-		Qclass: q.Qclass,
-	}
-	questionJSON, err := json.Marshal(question)
-	if err != nil {
-		return err
-	}
-
-	// 写入fabric cache
-	if duration > 0 && fabCon {
-		i := newItem(res, w.now(), duration, w.rate)
-		i_new := transToFabricItem(i)
-
-		// 并行调用CreateRR
-		go i_new.setRR(string(questionJSON), w.service)
-
-		// fmt.Printf("submit CreateRR: %s\n", string(questionJSON))
-		log.Info("successfully submit CreateRR to fabric cache", "key", string(questionJSON), "item", i_new)
-
-	} else if duration > 0 {
-		// write local cache
+	if duration > 0 {
 		w.set(key, res, mt, duration)
 	}
 
 	res = w.additionalAnswer(context.Background(), res)
 
 	return w.ResponseWriter.WriteMsg(res)
-}
-
-func (i *FabricItem) setRR(key string, srv ChainService) {
-	itemAsBytes, err := json.Marshal(i)
-	if err != nil {
-		log.Error("failed to set RR in fabric cache : failed to marshal", "error", err.Error())
-	}
-
-	log.Info("validation account test", strconv.Itoa(chainConfig.Validation_account))
-	_, err = srv.SendTransaction("CreateRR", key, string(itemAsBytes), strconv.Itoa(chainConfig.Validation_account))
-	if err != nil {
-		log.Info("failed to submit CreateRR transaction to fabric ")
-	}
-
 }
 
 func (c *Cache) purge(qname string, qtype uint16) {
@@ -441,8 +301,8 @@ func (c *Cache) additionalAnswer(ctx context.Context, msg *dns.Msg) *dns.Msg {
 		return msg
 	}
 
-	cnameReq := AcquireCacheMsg()
-	defer ReleaseCacheMsg(cnameReq)
+	cnameReq := AcquireMsg()
+	defer ReleaseMsg(cnameReq)
 
 	cnameReq.SetEdns0(dnsutil.DefaultMsgSize, true)
 	cnameReq.CheckingDisabled = msg.CheckingDisabled
@@ -542,7 +402,7 @@ func computeTTL(msgTTL, minTTL, maxTTL time.Duration) time.Duration {
 var messagePool sync.Pool
 
 // AcquireMsg returns an empty msg from pool
-func AcquireCacheMsg() *dns.Msg {
+func AcquireMsg() *dns.Msg {
 	v := messagePool.Get()
 	if v == nil {
 		return &dns.Msg{}
@@ -551,7 +411,7 @@ func AcquireCacheMsg() *dns.Msg {
 }
 
 // ReleaseMsg returns msg to pool
-func ReleaseCacheMsg(m *dns.Msg) {
+func ReleaseMsg(m *dns.Msg) {
 	m.Id = 0
 	m.Response = false
 	m.Opcode = 0

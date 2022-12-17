@@ -3,9 +3,12 @@ package server
 import (
 	"bufio"
 	"context"
+	"encoding/json"
+	"fmt"
 	"io"
 	l "log"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -14,10 +17,14 @@ import (
 
 	"github.com/semihalev/log"
 	"github.com/semihalev/sdns/config"
+	"github.com/semihalev/sdns/dnsutil"
 	"github.com/semihalev/sdns/middleware"
 	"github.com/semihalev/sdns/mock"
+	"github.com/semihalev/sdns/response"
 	"github.com/semihalev/sdns/server/doh"
 )
+
+// var srv ChainService
 
 // Server type
 type Server struct {
@@ -28,6 +35,10 @@ type Server struct {
 	tlsPrivateKey  string
 
 	chainPool sync.Pool
+
+	now func() time.Time
+
+	service ChainService
 }
 
 // New return new server
@@ -42,6 +53,7 @@ func New(cfg *config.Config) *Server {
 		dohAddr:        cfg.BindDOH,
 		tlsCertificate: cfg.TLSCertificate,
 		tlsPrivateKey:  cfg.TLSPrivateKey,
+		now:            time.Now,
 	}
 
 	server.chainPool.New = func() interface{} {
@@ -53,6 +65,71 @@ func New(cfg *config.Config) *Server {
 
 // ServeDNS implements the Handle interface.
 func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
+
+	log.Info("receive dns msg", "msg", r.String())
+
+	if fabCon {
+		// 查询区块链
+		q := r.Question[0]
+
+		// 构造fabric key
+		question := Question{
+			Name:   q.Name,
+			Qtype:  q.Qtype,
+			Qclass: q.Qclass,
+		}
+		questionJSON, err := json.Marshal(question)
+		if err != nil {
+			return
+		}
+
+		i_new := new(FabricItem)
+		found := false
+		now := s.now().UTC()
+
+		log.Info("fabric cache receive a dns msg", "qname", q.Name, "qtype", q.Qtype, "question", string(questionJSON))
+
+		// 调用queryRR合约查询资源记录
+		result, err := s.service.Call("queryRR", string(questionJSON))
+		if err == nil {
+
+			err = json.Unmarshal(result, i_new)
+			if err != nil {
+				log.Error("failed to unmarshal", "error", err.Error())
+			}
+			found = true
+
+			ttl := i_new.newttl(now)
+
+			log.Info("successfully get and transform result from fabric cache", "question", string(questionJSON), "remainTTL", ttl, "item", i_new)
+
+			// 判断validation是否有效
+			if !i_new.Validation {
+				found = false
+				log.Info("RR from the fabric cache has not been validated", "question", string(questionJSON))
+			}
+
+			// 判断TTL是否到期
+			if ttl <= 0 {
+				found = false
+				log.Info("RR from the fabric cache expired in TTL", "remainTTL", ttl)
+			}
+
+		} else {
+			// fabric cache上未查到
+			log.Info("failed to find the RR from the fabric cache. ", "question", string(questionJSON), "error", err.Error())
+		}
+
+		// 在fabric cache中找到, reply to client
+		if found {
+			i := transItem(i_new)
+			m := i.toMsg(r, now)
+
+			_ = w.WriteMsg(m)
+			return
+		}
+	}
+
 	ch := s.chainPool.Get().(*middleware.Chain)
 
 	ch.Reset(w, r)
@@ -60,6 +137,56 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	ch.Next(context.Background())
 
 	s.chainPool.Put(ch)
+
+	log.Info("dns response msg", "res", w.Msg())
+
+	if fabCon {
+		go func() {
+			res := w.Msg()
+			q := res.Question[0]
+
+			mt, _ := response.Typify(res, s.now().UTC())
+
+			msgTTL := dnsutil.MinimalTTL(res, mt)
+			duration := computeTTL(msgTTL, dnsutil.MinimalDefaultTTL, dnsutil.MaximumDefaulTTL)
+
+			// 构造fabric key
+			question := Question{
+				Name:   q.Name,
+				Qtype:  q.Qtype,
+				Qclass: q.Qclass,
+			}
+			questionJSON, err := json.Marshal(question)
+			if err != nil {
+				return
+			}
+
+			if duration > 0 {
+				i := newItem(res, s.now(), duration, 0)
+				i_new := transToFabricItem(i)
+
+				i_new.setRR(string(questionJSON), s.service)
+
+				fmt.Println("successfully submit CreateRR to fabric cache", "key: ", string(questionJSON), "item: ", i_new)
+			}
+
+		}()
+
+	}
+
+}
+
+func (i *FabricItem) setRR(key string, srv ChainService) {
+	itemAsBytes, err := json.Marshal(i)
+	if err != nil {
+		log.Error("failed to set RR in fabric cache : failed to marshal", "error", err.Error())
+	}
+
+	_, err = srv.SendTransaction("CreateRR", key, string(itemAsBytes), strconv.Itoa(chainConfig.Validation_account))
+	if err != nil {
+		log.Info("failed to submit CreateRR transaction to fabric ")
+	}
+
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -100,6 +227,17 @@ func (s *Server) Run() {
 // for incoming queries.
 func (s *Server) ListenAndServeDNS(network string) {
 	log.Info("DNS server listening...", "net", network, "addr", s.addr)
+
+	if network == "udp" {
+		srv, err := NewChainService(ChainTypeFabric, "")
+		if srv == nil || err != nil {
+			log.Info("cannot connect fabric contract, use traditional cache instead")
+			fabCon = false
+		} else {
+			log.Info("cache successfully connect to fabric contract")
+		}
+		s.service = srv
+	}
 
 	server := &dns.Server{
 		Addr:          s.addr,

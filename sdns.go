@@ -68,6 +68,7 @@ func setup() {
 	log.Root().SetHandler(log.LvlFilterHandler(lvl, log.StdoutHandler))
 
 	middleware.Setup(cfg)
+
 }
 
 func run() {

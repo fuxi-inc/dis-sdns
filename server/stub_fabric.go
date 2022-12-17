@@ -1,4 +1,4 @@
-package cache
+package server
 
 import (
 	"encoding/json"
@@ -19,8 +19,8 @@ import (
 )
 
 const (
-	DefaultProfile = "dev"
 	ConfigFile     = "connection.yaml"
+	DefaultProfile = "dev"
 )
 
 var fabCon = false
@@ -37,13 +37,6 @@ type FabricService struct {
 	Gateway  *gateway.Gateway
 	Network  *gateway.Network
 	Contract *gateway.Contract
-}
-
-// fabric key for RR
-type Question struct {
-	Name   string `json:"name"`
-	Qtype  uint16 `json:"qtype"`
-	Qclass uint16 `json:"qclass"`
 }
 
 // fabric createRR event
