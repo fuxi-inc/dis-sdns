@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/config"
 	"github.com/hyperledger/fabric-sdk-go/pkg/gateway"
 	"github.com/miekg/dns"
@@ -124,78 +125,80 @@ func (f *FabricService) LoadConfig(confs ...string) error {
 				"payload: %v \ntxid: %v \nblock: %v \nsourceURL: %v\n",
 				e.ChaincodeID, e.EventName, string(e.Payload), e.TxID, e.BlockNumber, e.SourceURL)
 
-			event := new(Event)
-			err := json.Unmarshal(e.Payload, event)
-			if err != nil {
-				log.Error("failed to unmarshal", "event", string(e.Payload), "error", err.Error())
-				continue
-			}
-
-			itemAsBytes := []byte(event.Item)
-
-			fabricItem := new(FabricItem)
-			err = json.Unmarshal(itemAsBytes, fabricItem)
-			if err != nil {
-				log.Error("failed to unmarshal", "fabricitem", string(itemAsBytes), "error", err.Error())
-				continue
-			}
-
-			if fabricItem.CreatorID == string(clientID) {
-				log.Info("Creator == ClientID, don't validate", "clientID", string(clientID))
-				continue
-			}
-
-			if fabricItem.Validation {
-				// no validation required
-				log.Info("no validation required", "key", event.Key)
-				continue
-			}
-
-			// 验证记录的正确性，决定投票结果
-			validation := false
-
-			q := new(Question)
-			err = json.Unmarshal([]byte(event.Key), q)
-			if err != nil {
-				log.Error("failed to unmarshal", "quastion", event.Key, "error", err.Error())
-				continue
-			}
-
-			name := dns.Fqdn(q.Name)
-			split := dns.SplitDomainName(name)
-
-			// 检索fuxi域，直接通过forwarder
-			if len(split) > 0 && split[len(split)-1] == "fuxi" {
-				validation = true
-			} else {
-
-				// TODO: resolve validation
-				// qtype := dns.TypeToString[q.Qtype]
-
-				// fmt.Printf("validation resolve req: %s, %s\n", name, qtype)
-				// for _, rr := range validation_resolver.Resolve(name, qtype) {
-				// 	// fmt.Println(rr.String())
-				// }
-
-				// TODO: 比较resp和fabricItem
-				validation = true
-
-			}
-
-			if validation {
-
-				_, err = contract.SubmitTransaction("VoteTrue", event.Key)
+			go func(e *fab.CCEvent) {
+				event := new(Event)
+				err := json.Unmarshal(e.Payload, event)
 				if err != nil {
-					// log.Error("failed to submit VoteTrue transaction to fabric", "error", err.Error())
-					fmt.Printf("failed to submit VoteTrue transaction to fabric: %s", err.Error())
-					continue
+					log.Error("failed to unmarshal", "event", string(e.Payload), "error", err.Error())
+					return
 				}
 
-				fmt.Printf("Successfully Submit VoteTrue transaction to fabric: %s\n", event.Key)
-			} else {
-				fmt.Printf("did not vote for true: %s\n", event.Key)
-				// TODO: 投反对票?
-			}
+				itemAsBytes := []byte(event.Item)
+
+				fabricItem := new(FabricItem)
+				err = json.Unmarshal(itemAsBytes, fabricItem)
+				if err != nil {
+					log.Error("failed to unmarshal", "fabricitem", string(itemAsBytes), "error", err.Error())
+					return
+				}
+
+				if fabricItem.CreatorID == string(clientID) {
+					log.Info("Creator == ClientID, don't validate", "clientID", string(clientID))
+					return
+				}
+
+				if fabricItem.Validation {
+					// no validation required
+					log.Info("no validation required", "key", event.Key)
+					return
+				}
+
+				// 验证记录的正确性，决定投票结果
+				validation := false
+
+				q := new(Question)
+				err = json.Unmarshal([]byte(event.Key), q)
+				if err != nil {
+					log.Error("failed to unmarshal", "quastion", event.Key, "error", err.Error())
+					return
+				}
+
+				name := dns.Fqdn(q.Name)
+				split := dns.SplitDomainName(name)
+
+				// 检索fuxi域，直接通过forwarder
+				if len(split) > 0 && split[len(split)-1] == "fuxi" {
+					validation = true
+				} else {
+
+					// TODO: resolve validation
+					// qtype := dns.TypeToString[q.Qtype]
+
+					// fmt.Printf("validation resolve req: %s, %s\n", name, qtype)
+					// for _, rr := range validation_resolver.Resolve(name, qtype) {
+					// 	// fmt.Println(rr.String())
+					// }
+
+					// TODO: 比较resp和fabricItem
+					validation = true
+
+				}
+
+				if validation {
+
+					_, err = contract.SubmitTransaction("VoteTrue", event.Key)
+					if err != nil {
+						// log.Error("failed to submit VoteTrue transaction to fabric", "error", err.Error())
+						fmt.Printf("failed to submit VoteTrue transaction to fabric: %s", err.Error())
+						return
+					}
+
+					fmt.Printf("Successfully Submit VoteTrue transaction to fabric: %s\n", event.Key)
+				} else {
+					fmt.Printf("did not vote for true: %s\n", event.Key)
+					// TODO: 投反对票?
+				}
+			}(e)
 
 		}
 	}()
