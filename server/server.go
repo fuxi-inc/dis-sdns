@@ -139,17 +139,16 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	s.chainPool.Put(ch)
 
 	log.Info("dns response msg", "res", w.Msg())
+	res := w.Msg()
+	q := res.Question[0]
 
-	if fabCon {
+	mt, _ := response.Typify(res, s.now().UTC())
+
+	msgTTL := dnsutil.MinimalTTL(res, mt)
+	duration := computeTTL(msgTTL, dnsutil.MinimalDefaultTTL, dnsutil.MaximumDefaulTTL)
+
+	if fabCon && duration >= 30 {
 		go func() {
-			res := w.Msg()
-			q := res.Question[0]
-
-			mt, _ := response.Typify(res, s.now().UTC())
-
-			msgTTL := dnsutil.MinimalTTL(res, mt)
-			duration := computeTTL(msgTTL, dnsutil.MinimalDefaultTTL, dnsutil.MaximumDefaulTTL)
-
 			// 构造fabric key
 			question := Question{
 				Name:   q.Name,
