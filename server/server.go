@@ -191,6 +191,7 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 				fmt.Printf("Did NOT receive CC event for eventId(%s)\n", txID)
 			}
 
+			fmt.Printf("finished receive voting msg\n")
 		}()
 
 	}
