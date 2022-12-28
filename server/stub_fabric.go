@@ -179,10 +179,11 @@ func (f *FabricService) LoadConfig(confs ...string) error {
 
 			// ----TODO: 查询验证------
 			// 目前随机验证是否通过
+			query := event.Query
 			validation := rand.Intn(2)
 
 			if validation == 1 {
-				_, err = contract.SubmitTransaction("Vote", event.TxID, "yes")
+				_, err = contract.SubmitTransaction("Vote", query, event.TxID, "yes")
 				if err != nil {
 					fmt.Printf("failed to submit VoteTrue transaction to fabric: %s", err.Error())
 					continue
