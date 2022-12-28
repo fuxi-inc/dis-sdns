@@ -165,7 +165,10 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 			i := newItem(res, s.now(), duration, 0)
 			i_new := transToFabricItem(i)
 
-			txID := i_new.setRR(string(questionJSON), s.service)
+			txID, err := i_new.setRR(string(questionJSON), s.service)
+			if err != nil {
+				return
+			}
 
 			fmt.Println("successfully submit StartValidation", "key: ", string(questionJSON), "item: ", i_new)
 
@@ -194,18 +197,20 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 
 }
 
-func (i *FabricItem) setRR(key string, srv ChainService) string {
+func (i *FabricItem) setRR(key string, srv ChainService) (string, error) {
 	itemAsBytes, err := json.Marshal(i)
 	if err != nil {
 		log.Error("failed to set RR in fabric cache : failed to marshal", "error", err.Error())
+		return "", err
 	}
 
 	txID, err := srv.SendTransaction("StartValidation", key, string(itemAsBytes), strconv.Itoa(chainConfig.Validators_account), strconv.Itoa(chainConfig.Voters_account))
 	if err != nil {
-		log.Info("failed to submit CreateRR transaction to fabric ")
+		log.Info("failed to submit StartValidation transaction to fabric ", "error", err.Error())
+		return "", err
 	}
 
-	return string(txID)
+	return string(txID), nil
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
