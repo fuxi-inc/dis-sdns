@@ -1,6 +1,10 @@
 package server
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/hyperledger/fabric-sdk-go/pkg/gateway"
+)
 
 type ChainService interface {
 	//获取区块链类型
@@ -14,6 +18,9 @@ type ChainService interface {
 
 	//加载配置文件
 	LoadConfig(confs ...string) error
+
+	//直接获取合约
+	GetContract() *gateway.Contract
 }
 
 const ChainTypeFabric = "Fabric"

@@ -5,13 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"path/filepath"
 
 	"github.com/domainr/dnsr"
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/config"
 	"github.com/hyperledger/fabric-sdk-go/pkg/gateway"
-	"github.com/miekg/dns"
 	"github.com/semihalev/log"
 	"github.com/spf13/viper"
 
@@ -40,9 +40,10 @@ type FabricService struct {
 }
 
 // fabric createRR event
-type Event struct {
-	Key  string `json:"key"`
-	Item string `json:"item"`
+type validationEvent struct {
+	TxID  string `json:"txid"`
+	Query string `json:"query"`
+	Item  string `json:"item"`
 }
 
 func (f *FabricService) getType() string {
@@ -57,6 +58,10 @@ func (f *FabricService) Call(name string, args ...string) ([]byte, error) {
 func (f *FabricService) SendTransaction(name string, args ...string) ([]byte, error) {
 	response, err := f.Contract.SubmitTransaction(name, args...)
 	return response, err
+}
+
+func (f *FabricService) GetContract() *gateway.Contract {
+	return f.Contract
 }
 
 // 连接Fabric，返回*gateway.Contract
@@ -111,7 +116,7 @@ func (f *FabricService) LoadConfig(confs ...string) error {
 	log.Info("successfully register ID", "clientID", string(clientID))
 
 	// register fabric CreateRR event
-	_, notifier, err := contract.RegisterEvent("CreateRR")
+	_, notifier, err := contract.RegisterEvent("validation " + string(clientID))
 	if err != nil {
 		fmt.Printf("Failed to register contract event: %s", err)
 		return err
@@ -125,7 +130,7 @@ func (f *FabricService) LoadConfig(confs ...string) error {
 				"payload: %v \ntxid: %v \nblock: %v \nsourceURL: %v\n",
 				e.ChaincodeID, e.EventName, string(e.Payload), e.TxID, e.BlockNumber, e.SourceURL)
 
-			event := new(Event)
+			event := new(validationEvent)
 			err := json.Unmarshal(e.Payload, event)
 			if err != nil {
 				log.Error("failed to unmarshal", "event", string(e.Payload), "error", err.Error())
@@ -141,61 +146,57 @@ func (f *FabricService) LoadConfig(confs ...string) error {
 				continue
 			}
 
-			if fabricItem.CreatorID == string(clientID) {
-				log.Info("Creator == ClientID, don't validate", "clientID", string(clientID))
-				continue
-			}
-
-			if fabricItem.Validation {
-				// no validation required
-				log.Info("no validation required", "key", event.Key)
-				continue
-			}
-
 			// 验证记录的正确性，决定投票结果
-			validation := false
+			// validation := false
 
-			q := new(Question)
-			err = json.Unmarshal([]byte(event.Key), q)
-			if err != nil {
-				log.Error("failed to unmarshal", "quastion", event.Key, "error", err.Error())
-				continue
-			}
-
-			name := dns.Fqdn(q.Name)
-			split := dns.SplitDomainName(name)
+			// name := dns.Fqdn(q.Name)
+			// split := dns.SplitDomainName(name)
 
 			// 检索fuxi域，直接通过forwarder
-			if len(split) > 0 && split[len(split)-1] == "fuxi" {
-				validation = true
-			} else {
+			// if len(split) > 0 && split[len(split)-1] == "fuxi" {
+			// 	validation = true
+			// } else {
 
-				// TODO: resolve validation
-				// qtype := dns.TypeToString[q.Qtype]
+			// 	// TODO: resolve validation
+			// 	// qtype := dns.TypeToString[q.Qtype]
 
-				// fmt.Printf("validation resolve req: %s, %s\n", name, qtype)
-				// for _, rr := range validation_resolver.Resolve(name, qtype) {
-				// 	// fmt.Println(rr.String())
-				// }
+			// 	// fmt.Printf("validation resolve req: %s, %s\n", name, qtype)
+			// 	// for _, rr := range validation_resolver.Resolve(name, qtype) {
+			// 	// 	// fmt.Println(rr.String())
+			// 	// }
 
-				// TODO: 比较resp和fabricItem
-				validation = true
+			// 	// TODO: 比较resp和fabricItem
+			// 	validation = true
 
-			}
+			// }
 
-			if validation {
+			// q := new(validationEvent)
+			// err = json.Unmarshal([]byte(event.Key), q)
+			// if err != nil {
+			// 	log.Error("failed to unmarshal", "quastion", event.Key, "error", err.Error())
+			// 	continue
+			// }
 
-				_, err = contract.SubmitTransaction("VoteTrue", event.Key)
+			// ----TODO: 查询验证------
+			// 目前随机验证是否通过
+			validation := rand.Intn(2)
+
+			if validation == 1 {
+				_, err = contract.SubmitTransaction("Vote", event.TxID, "yes")
 				if err != nil {
-					// log.Error("failed to submit VoteTrue transaction to fabric", "error", err.Error())
 					fmt.Printf("failed to submit VoteTrue transaction to fabric: %s", err.Error())
 					continue
 				}
 
-				fmt.Printf("Successfully Submit VoteTrue transaction to fabric: %s\n", event.Key)
+				fmt.Printf("Successfully Submit VoteTrue transaction to fabric: %s\n", event.TxID)
 			} else {
-				fmt.Printf("did not vote for true: %s\n", event.Key)
-				// TODO: 投反对票?
+				_, err = contract.SubmitTransaction("Vote", event.TxID, "no")
+				if err != nil {
+					fmt.Printf("failed to submit VoteFalse transaction to fabric: %s", err.Error())
+					continue
+				}
+
+				fmt.Printf("Successfully Submit VoteFalse transaction to fabric: %s\n", event.TxID)
 			}
 
 		}

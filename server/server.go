@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 	"github.com/miekg/dns"
 
 	"github.com/semihalev/log"
@@ -68,67 +69,67 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 
 	log.Info("receive dns msg", "msg", r.String())
 
-	if fabCon {
-		// 查询区块链
-		q := r.Question[0]
+	// if fabCon {
+	// 	// 查询区块链
+	// 	q := r.Question[0]
 
-		// 构造fabric key
-		question := Question{
-			Name:   q.Name,
-			Qtype:  q.Qtype,
-			Qclass: q.Qclass,
-		}
-		questionJSON, err := json.Marshal(question)
-		if err != nil {
-			return
-		}
+	// 	// 构造fabric key
+	// 	question := Question{
+	// 		Name:   q.Name,
+	// 		Qtype:  q.Qtype,
+	// 		Qclass: q.Qclass,
+	// 	}
+	// 	questionJSON, err := json.Marshal(question)
+	// 	if err != nil {
+	// 		return
+	// 	}
 
-		i_new := new(FabricItem)
-		found := false
-		now := s.now().UTC()
+	// 	i_new := new(FabricItem)
+	// 	found := false
+	// 	now := s.now().UTC()
 
-		log.Info("fabric cache receive a dns msg", "qname", q.Name, "qtype", q.Qtype, "question", string(questionJSON))
+	// 	log.Info("fabric cache receive a dns msg", "qname", q.Name, "qtype", q.Qtype, "question", string(questionJSON))
 
-		// 调用queryRR合约查询资源记录
-		result, err := s.service.Call("queryRR", string(questionJSON))
-		if err == nil {
+	// 	// 调用queryRR合约查询资源记录
+	// 	result, err := s.service.Call("queryRR", string(questionJSON))
+	// 	if err == nil {
 
-			err = json.Unmarshal(result, i_new)
-			if err != nil {
-				log.Error("failed to unmarshal", "error", err.Error())
-			}
-			found = true
+	// 		err = json.Unmarshal(result, i_new)
+	// 		if err != nil {
+	// 			log.Error("failed to unmarshal", "error", err.Error())
+	// 		}
+	// 		found = true
 
-			ttl := i_new.newttl(now)
+	// 		ttl := i_new.newttl(now)
 
-			log.Info("successfully get and transform result from fabric cache", "question", string(questionJSON), "remainTTL", ttl, "item", i_new)
+	// 		log.Info("successfully get and transform result from fabric cache", "question", string(questionJSON), "remainTTL", ttl, "item", i_new)
 
-			// 判断validation是否有效
-			if !i_new.Validation {
-				found = false
-				log.Info("RR from the fabric cache has not been validated", "question", string(questionJSON))
-			}
+	// 		// 判断validation是否有效
+	// 		if !i_new.Validation {
+	// 			found = false
+	// 			log.Info("RR from the fabric cache has not been validated", "question", string(questionJSON))
+	// 		}
 
-			// 判断TTL是否到期
-			if ttl <= 0 {
-				found = false
-				log.Info("RR from the fabric cache expired in TTL", "remainTTL", ttl)
-			}
+	// 		// 判断TTL是否到期
+	// 		if ttl <= 0 {
+	// 			found = false
+	// 			log.Info("RR from the fabric cache expired in TTL", "remainTTL", ttl)
+	// 		}
 
-		} else {
-			// fabric cache上未查到
-			log.Info("failed to find the RR from the fabric cache. ", "question", string(questionJSON), "error", err.Error())
-		}
+	// 	} else {
+	// 		// fabric cache上未查到
+	// 		log.Info("failed to find the RR from the fabric cache. ", "question", string(questionJSON), "error", err.Error())
+	// 	}
 
-		// 在fabric cache中找到, reply to client
-		if found {
-			i := transItem(i_new)
-			m := i.toMsg(r, now)
+	// 	// 在fabric cache中找到, reply to client
+	// 	if found {
+	// 		i := transItem(i_new)
+	// 		m := i.toMsg(r, now)
 
-			_ = w.WriteMsg(m)
-			return
-		}
-	}
+	// 		_ = w.WriteMsg(m)
+	// 		return
+	// 	}
+	// }
 
 	ch := s.chainPool.Get().(*middleware.Chain)
 
@@ -161,13 +162,30 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 				return
 			}
 
-			if duration > 0 {
-				i := newItem(res, s.now(), duration, 0)
-				i_new := transToFabricItem(i)
+			i := newItem(res, s.now(), duration, 0)
+			i_new := transToFabricItem(i)
 
-				i_new.setRR(string(questionJSON), s.service)
+			txID := i_new.setRR(string(questionJSON), s.service)
 
-				fmt.Println("successfully submit CreateRR to fabric cache", "key: ", string(questionJSON), "item: ", i_new)
+			fmt.Println("successfully submit StartValidation", "key: ", string(questionJSON), "item: ", i_new)
+
+			contract := s.service.GetContract()
+			// register fabric CreateRR event
+			reg, notifier, err := contract.RegisterEvent("voting " + txID)
+			if err != nil {
+				fmt.Printf("Failed to register contract event: %s", err)
+				return
+			}
+			defer contract.Unregister(reg)
+
+			// ---------TODO: 测试接收消息处理--------------
+			// 目前只是打印
+			var ccEvent *fab.CCEvent
+			select {
+			case ccEvent = <-notifier:
+				fmt.Printf("Received CC event: %#v\n", ccEvent)
+			case <-time.After(time.Second * 20):
+				fmt.Printf("Did NOT receive CC event for eventId(%s)\n", txID)
 			}
 
 		}()
@@ -176,17 +194,18 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 
 }
 
-func (i *FabricItem) setRR(key string, srv ChainService) {
+func (i *FabricItem) setRR(key string, srv ChainService) string {
 	itemAsBytes, err := json.Marshal(i)
 	if err != nil {
 		log.Error("failed to set RR in fabric cache : failed to marshal", "error", err.Error())
 	}
 
-	_, err = srv.SendTransaction("CreateRR", key, string(itemAsBytes), strconv.Itoa(chainConfig.Validation_account))
+	txID, err := srv.SendTransaction("StartValidation", key, string(itemAsBytes), strconv.Itoa(chainConfig.Validators_account), strconv.Itoa(chainConfig.Voters_account))
 	if err != nil {
 		log.Info("failed to submit CreateRR transaction to fabric ")
 	}
 
+	return string(txID)
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {

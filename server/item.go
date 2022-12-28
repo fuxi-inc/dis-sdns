@@ -55,12 +55,17 @@ type FabricItem struct {
 	OrigTTL uint32    `json:"originTTL"`
 	Stored  time.Time `json:"stored"`
 
-	Validation bool   `json:"validation"`
-	CreatorID  string `json:"creatorID"`
+	Validation string `json:"validation"`
 
-	Voters  []string `json:"voters"`
-	Account int      `json:"account"`
+	// Creator    string   `json:"creator"`
+	Validators    []string `json:"validators"`
+	Voters        []string `json:"voters"`
+	VotersAccount int      `json:"account"`
+
+	Update_txid string `json:"update_txid"`
 }
+
+
 
 func (i *FabricItem) newttl(now time.Time) int {
 	ttl := int(i.OrigTTL) - int(now.UTC().Sub(i.Stored).Seconds())
@@ -212,9 +217,8 @@ func transToFabricItem(i *item) *FabricItem {
 		Limiter:            i.Limiter,
 		OrigTTL:            i.origTTL,
 		Stored:             i.stored,
-		Validation:         false,
-		Voters:             []string{},
-		Account:            chainConfig.Validation_account,
+		Validation:         "unverified",
+		VotersAccount:      chainConfig.Voters_account,
 	}
 
 	for i, a := range i.Answer {

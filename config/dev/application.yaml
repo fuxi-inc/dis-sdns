@@ -1,5 +1,6 @@
 fabcon: "true"
-validation_account: "0"
+validators_account: "1"
+voters_account: "1"
 channel: "mychannel"
 chaincode_dis: "dis_resolver"
 msp_path: "/home/fuxi/fabric-samples/test-network/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp"
