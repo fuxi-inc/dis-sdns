@@ -62,10 +62,8 @@ type FabricItem struct {
 	Voters        []string `json:"voters"`
 	VotersAccount int      `json:"account"`
 
-	Update_txid string `json:"update_txid"`
+	Update_txid []string `json:"update_txid"`
 }
-
-
 
 func (i *FabricItem) newttl(now time.Time) int {
 	ttl := int(i.OrigTTL) - int(now.UTC().Sub(i.Stored).Seconds())
