@@ -41,9 +41,10 @@ type FabricService struct {
 
 // fabric createRR event
 type validationEvent struct {
-	TxID  string `json:"txid"`
-	Query string `json:"query"`
-	Item  string `json:"item"`
+	TxID       string   `json:"txid"`
+	Validators []string `json:"validators"`
+	Query      string   `json:"query"`
+	Item       string   `json:"item"`
 }
 
 type votingEvent struct {
@@ -121,7 +122,7 @@ func (f *FabricService) LoadConfig(confs ...string) error {
 	log.Info("successfully register ID", "clientID", string(clientID))
 
 	// register fabric CreateRR event
-	_, notifier, err := contract.RegisterEvent("validation " + string(clientID))
+	_, notifier, err := contract.RegisterEvent("validation")
 	if err != nil {
 		fmt.Printf("Failed to register contract event: %s", err)
 		return err
@@ -131,9 +132,6 @@ func (f *FabricService) LoadConfig(confs ...string) error {
 	// consume event and vote for validation
 	go func() {
 		for e := range notifier {
-			fmt.Printf("Receive cc event, ccid: %v \neventName: %v\n"+
-				"payload: %v \ntxid: %v \nblock: %v \nsourceURL: %v\n",
-				e.ChaincodeID, e.EventName, string(e.Payload), e.TxID, e.BlockNumber, e.SourceURL)
 
 			event := new(validationEvent)
 			err := json.Unmarshal(e.Payload, event)
@@ -141,6 +139,24 @@ func (f *FabricService) LoadConfig(confs ...string) error {
 				log.Error("failed to unmarshal", "event", string(e.Payload), "error", err.Error())
 				continue
 			}
+
+			// Judge the event
+			var found bool
+			for _, client := range event.Validators {
+
+				if string(clientID) == client {
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				continue
+			}
+
+			fmt.Printf("Receive cc event, ccid: %v \neventName: %v\n"+
+				"payload: %v \ntxid: %v \nblock: %v \nsourceURL: %v\n",
+				e.ChaincodeID, e.EventName, string(e.Payload), e.TxID, e.BlockNumber, e.SourceURL)
 
 			itemAsBytes := []byte(event.Item)
 
