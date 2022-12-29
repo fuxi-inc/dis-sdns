@@ -194,7 +194,7 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 			for {
 				select {
 				case e = <-notifier:
-					fmt.Printf("Receive cc event, ccid: %v \neventName: %v\n"+
+					fmt.Printf("Receive voting event, ccid: %v \neventName: %v\n"+
 						"payload: %v \ntxid: %v \nblock: %v \nsourceURL: %v\n",
 						e.ChaincodeID, e.EventName, string(e.Payload), e.TxID, e.BlockNumber, e.SourceURL)
 
@@ -212,7 +212,7 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 						y++
 						if y == chainConfig.Voters_account {
 							validation = true
-							voterStr = voterStr + " --- " + event.VoterID
+							voterStr = voterStr + event.VoterID + " --- "
 							break Loop
 						}
 					} else if result == "no" {
