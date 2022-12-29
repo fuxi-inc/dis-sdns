@@ -170,7 +170,7 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 				return
 			}
 
-			fmt.Println("successfully submit StartValidation", "key: ", string(questionJSON), "item: ", i_new)
+			fmt.Println("successfully submit StartValidation", "txID", txID, "key: ", string(questionJSON), "item: ", i_new)
 
 			contract := s.service.GetContract()
 			// register fabric CreateRR event
