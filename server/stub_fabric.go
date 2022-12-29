@@ -46,6 +46,11 @@ type validationEvent struct {
 	Item  string `json:"item"`
 }
 
+type votingEvent struct {
+	VoterID string `json:"voterID"`
+	Result  string `json:"result"`
+}
+
 func (f *FabricService) getType() string {
 	return "Fabric"
 }
@@ -191,7 +196,7 @@ func (f *FabricService) LoadConfig(confs ...string) error {
 
 				fmt.Printf("Successfully Submit VoteTrue transaction to fabric: %s\n", event.TxID)
 			} else {
-				_, err = contract.SubmitTransaction("Vote", event.TxID, "no")
+				_, err = contract.SubmitTransaction("Vote", query, event.TxID, "no")
 				if err != nil {
 					fmt.Printf("failed to submit VoteFalse transaction to fabric: %s", err.Error())
 					continue

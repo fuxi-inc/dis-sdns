@@ -183,15 +183,68 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 
 			// ---------TODO: 测试接收消息处理--------------
 			// 目前只是打印
-			var ccEvent *fab.CCEvent
-			select {
-			case ccEvent = <-notifier:
-				fmt.Printf("Received CC event: %#v\n", ccEvent)
-			case <-time.After(time.Second * 20):
-				fmt.Printf("Did NOT receive CC event for eventId(%s)\n", txID)
+			var e *fab.CCEvent
+
+			y := 0
+			n := 0
+			var validation bool
+			var voterStr string
+
+		Loop:
+			for {
+				select {
+				case e = <-notifier:
+					fmt.Printf("Receive cc event, ccid: %v \neventName: %v\n"+
+						"payload: %v \ntxid: %v \nblock: %v \nsourceURL: %v\n",
+						e.ChaincodeID, e.EventName, string(e.Payload), e.TxID, e.BlockNumber, e.SourceURL)
+
+					event := new(votingEvent)
+					err := json.Unmarshal(e.Payload, event)
+					if err != nil {
+						fmt.Println("failed to unmarshal")
+						continue Loop
+					}
+
+					result := event.Result
+
+					// Compute voting yes
+					if result == "yes" {
+						y++
+						if y == chainConfig.Voters_account {
+							validation = true
+							voterStr = voterStr + " --- " + event.VoterID
+							break Loop
+						}
+					} else if result == "no" {
+						// Compute Voting no
+						n++
+						if n == chainConfig.Validators_account-chainConfig.Voters_account+1 {
+							break Loop
+						}
+					}
+
+				case <-time.After(time.Second * 10):
+					fmt.Printf("Did NOT receive CC event for eventId(%s)\n", txID)
+					break Loop
+				}
+
+			}
+			fmt.Printf("finished receive voting msg\n")
+
+			var result string
+			if validation {
+				result = "yes"
+			} else {
+				result = "no"
 			}
 
-			fmt.Printf("finished receive voting msg\n")
+			_, err = s.service.SendTransaction("FinishValidation", string(questionJSON), txID, result, voterStr)
+			if err != nil {
+				fmt.Printf("failed to submit FinishValidation transaction to fabric: %s\n", err.Error())
+			} else {
+				fmt.Printf("successfully submit FinishValidation transaction to fabric\n")
+			}
+
 		}()
 
 	}
