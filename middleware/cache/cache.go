@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/semihalev/log"
 	"github.com/semihalev/sdns/middleware"
 	"github.com/semihalev/sdns/waitgroup"
 	"golang.org/x/time/rate"
@@ -145,6 +146,7 @@ func (c *Cache) ServeDNS(ctx context.Context, ch *middleware.Chain) {
 		m := i.toMsg(req, now)
 		m = c.additionalAnswer(ctx, m)
 
+		log.Info("get msg from local cache", "msg", m.String())
 		_ = w.WriteMsg(m)
 		ch.Cancel()
 		return
@@ -249,13 +251,14 @@ func (c *Cache) get(key uint64, now time.Time) (*item, bool) {
 // set adds a new element to the cache. If the element already exists it is overwritten.
 func (c *Cache) set(key uint64, msg *dns.Msg, mt response.Type, duration time.Duration) {
 	switch mt {
-	case response.NoError, response.Delegation, response.NameError, response.NoData:
+	// case response.NoError, response.Delegation, response.NameError, response.NoData:
+	case response.NoError:
 		i := newItem(msg, c.now(), duration, c.rate)
 		c.pcache.Add(key, i)
 
-	case response.OtherError:
-		i := newItem(msg, c.now(), duration, c.rate)
-		c.ncache.Add(key, i)
+		// case response.OtherError:
+		// 	i := newItem(msg, c.now(), duration, c.rate)
+		// 	c.ncache.Add(key, i)
 	}
 }
 

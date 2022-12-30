@@ -66,7 +66,7 @@ func New(cfg *config.Config) *Server {
 // ServeDNS implements the Handle interface.
 func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 
-	log.Info("receive dns msg", "msg", r.String())
+	// log.Info("receive dns msg", "msg", r.String())
 
 	if fabCon {
 		// 查询区块链
@@ -138,7 +138,7 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 
 	s.chainPool.Put(ch)
 
-	log.Info("dns response msg", "res", w.Msg())
+	// log.Info("dns response msg", "res", w.Msg())
 	res := w.Msg()
 	q := res.Question[0]
 
