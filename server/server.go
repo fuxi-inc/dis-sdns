@@ -240,7 +240,7 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 
 			_, err = s.service.SendTransaction("FinishValidation", string(questionJSON), txID, result, voterStr)
 			if err != nil {
-				fmt.Printf("failed to submit FinishValidation transaction to fabric: %s\n", err.Error())
+				fmt.Printf("failed to submit FinishValidation txid: %s transaction to fabric: %s\n", txID, err.Error())
 			} else {
 				fmt.Printf("successfully submit FinishValidation transaction to fabric\n")
 			}
