@@ -1,5 +1,5 @@
 fabcon: "true"
-validators_account: "1"
+validators_account: "2"
 voters_account: "1"
 channel: "mychannel"
 chaincode_dis: "dis_resolver"
@@ -8,3 +8,4 @@ con_path: "/home/fuxi/fabric-samples/test-network/organizations/peerOrganization
 msp_id: "Org1MSP"
 user_name: "resUser"
 discoveryaslocalhost: "true"
+bind: "53"

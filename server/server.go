@@ -27,6 +27,8 @@ import (
 
 // var srv ChainService
 
+// var m []uint16
+
 // Server type
 type Server struct {
 	addr           string
@@ -141,111 +143,155 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 
 	log.Info("dns response msg", "res", w.Msg())
 
-	if fabCon {
-		go func() {
-			res := w.Msg()
-			q := res.Question[0]
+	// -------TODO: ignore repeate msg ----
+	// id := w.Msg().Id
+	// for _, value := range m {
+	// 	if value == id {
+	// 		log.Info("repeat msg detected", "msg_id", strconv.Itoa(int(id)))
+	// 		m
+	// 		return
+	// 	}
+	// }
 
-			mt, _ := response.Typify(res, s.now().UTC())
+	res := w.Msg()
+	q := res.Question[0]
 
-			msgTTL := dnsutil.MinimalTTL(res, mt)
-			duration := computeTTL(msgTTL, dnsutil.MinimalDefaultTTL, dnsutil.MaximumDefaulTTL)
+	// query verification ；目前只针对A记录
+	if (q.Qtype == dns.TypeA || q.Qtype == dns.TypeAAAA) && fabCon {
 
-			// 构造fabric key
-			question := Question{
-				Name:   q.Name,
-				Qtype:  q.Qtype,
-				Qclass: q.Qclass,
-			}
-			questionJSON, err := json.Marshal(question)
-			if err != nil {
-				return
-			}
+		mt, _ := response.Typify(res, s.now().UTC())
 
-			i := newItem(res, s.now(), duration, 0)
-			i_new := transToFabricItem(i)
+		msgTTL := dnsutil.MinimalTTL(res, mt)
+		duration := computeTTL(msgTTL, dnsutil.MinimalDefaultTTL, dnsutil.MaximumDefaulTTL)
 
-			txID, err := i_new.setRR(string(questionJSON), s.service)
-			if err != nil {
-				return
-			}
+		// 构造fabric key
+		question := Question{
+			Name:   q.Name,
+			Qtype:  q.Qtype,
+			Qclass: q.Qclass,
+		}
+		questionJSON, err := json.Marshal(question)
+		if err != nil {
+			return
+		}
 
-			fmt.Println("successfully submit StartValidation", "txID", txID, "key: ", string(questionJSON), "item: ", i_new)
+		i := newItem(res, s.now(), duration, 0)
+		i_new := transToFabricItem(i)
 
-			contract := s.service.GetContract()
-			// register fabric CreateRR event
-			reg, notifier, err := contract.RegisterEvent("voting " + txID)
-			if err != nil {
-				fmt.Printf("Failed to register contract event: %s", err)
-				return
-			}
-			defer contract.Unregister(reg)
+		itemAsBytes, err := json.Marshal(i_new)
+		if err != nil {
+			log.Error("failed to set RR in fabric cache : failed to marshal", "error", err.Error())
+			return
+		}
 
-			// ---------TODO: 测试接收消息处理--------------
-			// 目前只是打印
-			var e *fab.CCEvent
+		resultAsBytes, err := s.service.Call("QueryVerify", string(questionJSON), string(itemAsBytes))
+		if err != nil {
+			log.Warn("failed to evaluate", "question", string(questionJSON), "item", string(itemAsBytes))
+		}
 
-			y := 0
-			n := 0
-			var validation bool
-			var voterStr string
+		var result *verifyresult
+		err = json.Unmarshal(resultAsBytes, result)
+		if err != nil {
+			log.Warn("failed to unmarshal", "question", string(questionJSON), "item", string(itemAsBytes))
+			return
+		}
 
-		Loop:
-			for {
-				select {
-				case e = <-notifier:
-					fmt.Printf("Receive voting event, ccid: %v \neventName: %v\n"+
-						"payload: %v \ntxid: %v \nblock: %v \nsourceURL: %v\n",
-						e.ChaincodeID, e.EventName, string(e.Payload), e.TxID, e.BlockNumber, e.SourceURL)
+		// if updating transaction
+		if result.Result == "collision" {
+			i_new.Validation = "updating"
+			i_new.Update_txid = result.Update_txid
+		}
 
-					event := new(votingEvent)
-					err := json.Unmarshal(e.Payload, event)
-					if err != nil {
-						fmt.Println("failed to unmarshal")
-						continue Loop
-					}
-
-					result := event.Result
-
-					// Compute voting yes
-					if result == "yes" {
-						y++
-						if y == chainConfig.Voters_account {
-							validation = true
-							voterStr = voterStr + event.VoterID + " --- "
-							break Loop
-						}
-					} else if result == "no" {
-						// Compute Voting no
-						n++
-						if n == chainConfig.Validators_account-chainConfig.Voters_account+1 {
-							break Loop
-						}
-					}
-
-				case <-time.After(time.Second * 10):
-					fmt.Printf("Did NOT receive CC event for eventId(%s)\n", txID)
-					break Loop
+		if result.Result == "verified" {
+			// 验证通过， 直接返回
+			// -----TODO: 添加返回信息-----
+			log.Info("verified successfully", "question", string(questionJSON), "item", string(itemAsBytes))
+			return
+		} else {
+			go func() {
+				txID, err := i_new.setRR(string(questionJSON), s.service)
+				if err != nil {
+					return
 				}
 
-			}
-			fmt.Printf("finished receive voting msg\n")
+				fmt.Println("successfully submit StartValidation", "txID", txID, "key: ", string(questionJSON), "item: ", i_new)
 
-			var result string
-			if validation {
-				result = "yes"
-			} else {
-				result = "no"
-			}
+				contract := s.service.GetContract()
+				// register fabric CreateRR event
+				reg, notifier, err := contract.RegisterEvent("voting " + txID)
+				if err != nil {
+					fmt.Printf("Failed to register contract event: %s", err)
+					return
+				}
+				defer contract.Unregister(reg)
 
-			_, err = s.service.SendTransaction("FinishValidation", string(questionJSON), txID, result, voterStr)
-			if err != nil {
-				fmt.Printf("failed to submit FinishValidation txid: %s transaction to fabric: %s\n", txID, err.Error())
-			} else {
-				fmt.Printf("successfully submit FinishValidation transaction to fabric\n")
-			}
+				var e *fab.CCEvent
 
-		}()
+				y := 0
+				n := 0
+				var validation bool
+				var voterStr string
+
+			Loop:
+				for {
+					select {
+					case e = <-notifier:
+						fmt.Printf("Receive voting event, ccid: %v \neventName: %v\n"+
+							"payload: %v \ntxid: %v \nblock: %v \nsourceURL: %v\n",
+							e.ChaincodeID, e.EventName, string(e.Payload), e.TxID, e.BlockNumber, e.SourceURL)
+
+						event := new(votingEvent)
+						err := json.Unmarshal(e.Payload, event)
+						if err != nil {
+							fmt.Println("failed to unmarshal")
+							continue Loop
+						}
+
+						result := event.Result
+
+						// Compute voting yes
+						if result == "yes" {
+							y++
+							if y == chainConfig.Voters_account {
+								validation = true
+								voterStr = voterStr + event.VoterID + " --- "
+								break Loop
+							}
+						} else if result == "no" {
+							// Compute Voting no
+							n++
+							if n == chainConfig.Validators_account-chainConfig.Voters_account+1 {
+								break Loop
+							}
+						}
+
+					case <-time.After(time.Second * 10):
+						fmt.Printf("Did NOT receive CC event for eventId(%s)\n", txID)
+						break Loop
+					}
+
+				}
+				fmt.Printf("finished receive voting msg\n")
+
+				var result string
+				if validation {
+					result = "yes"
+				} else {
+					result = "no"
+				}
+
+				_, err = s.service.SendTransaction("FinishValidation", string(questionJSON), txID, result, voterStr)
+				if err != nil {
+					fmt.Printf("failed to submit FinishValidation txid: %s transaction to fabric: %s\n", txID, err.Error())
+				} else {
+					fmt.Printf("successfully submit FinishValidation transaction to fabric\n")
+				}
+
+			}()
+
+		}
+
+		// write
 
 	}
 
@@ -296,7 +342,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // Run listen the services
 func (s *Server) Run() {
 	go s.ListenAndServeDNS("udp")
-	go s.ListenAndServeDNS("tcp")
+	// go s.ListenAndServeDNS("tcp")
 	go s.ListenAndServeDNSTLS()
 	go s.ListenAndServeHTTP()
 }

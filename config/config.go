@@ -72,6 +72,7 @@ type ChainCfg struct {
 	MSPID                string `mapstructure:"msp_id"`
 	UserName             string `mapstructure:"user_name"`
 	DiscoveryAsLocalhost string `mapstructure:"discoveryaslocalhost"`
+	Bind                 string `mapstructure:"bind"`
 }
 
 // Plugin type

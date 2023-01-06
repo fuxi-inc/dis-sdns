@@ -5,13 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
+	"math"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/domainr/dnsr"
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/config"
 	"github.com/hyperledger/fabric-sdk-go/pkg/gateway"
+	"github.com/miekg/dns"
 	"github.com/semihalev/log"
 	"github.com/spf13/viper"
 
@@ -50,6 +52,11 @@ type validationEvent struct {
 type votingEvent struct {
 	VoterID string `json:"voterID"`
 	Result  string `json:"result"`
+}
+
+type verifyresult struct {
+	Result      string   `json:"result"`
+	Update_txid []string `json:"update_txid"`
 }
 
 func (f *FabricService) getType() string {
@@ -136,7 +143,7 @@ func (f *FabricService) LoadConfig(confs ...string) error {
 			event := new(validationEvent)
 			err := json.Unmarshal(e.Payload, event)
 			if err != nil {
-				log.Error("failed to unmarshal", "event", string(e.Payload), "error", err.Error())
+				fmt.Println("failed to unmarshal", "event", string(e.Payload), "error", err.Error())
 				continue
 			}
 
@@ -163,47 +170,32 @@ func (f *FabricService) LoadConfig(confs ...string) error {
 			fabricItem := new(FabricItem)
 			err = json.Unmarshal(itemAsBytes, fabricItem)
 			if err != nil {
-				log.Error("failed to unmarshal", "fabricitem", string(itemAsBytes), "error", err.Error())
+				fmt.Println("failed to unmarshal", "fabricitem", string(itemAsBytes), "error", err.Error())
 				continue
 			}
 
-			// 验证记录的正确性，决定投票结果
-			// validation := false
-
-			// name := dns.Fqdn(q.Name)
-			// split := dns.SplitDomainName(name)
-
-			// 检索fuxi域，直接通过forwarder
-			// if len(split) > 0 && split[len(split)-1] == "fuxi" {
-			// 	validation = true
-			// } else {
-
-			// 	// TODO: resolve validation
-			// 	// qtype := dns.TypeToString[q.Qtype]
-
-			// 	// fmt.Printf("validation resolve req: %s, %s\n", name, qtype)
-			// 	// for _, rr := range validation_resolver.Resolve(name, qtype) {
-			// 	// 	// fmt.Println(rr.String())
-			// 	// }
-
-			// 	// TODO: 比较resp和fabricItem
-			// 	validation = true
-
-			// }
-
-			// q := new(validationEvent)
-			// err = json.Unmarshal([]byte(event.Key), q)
-			// if err != nil {
-			// 	log.Error("failed to unmarshal", "quastion", event.Key, "error", err.Error())
-			// 	continue
-			// }
-
 			// ----TODO: 查询验证------
-			// 目前随机验证是否通过
-			query := event.Query
-			validation := rand.Intn(2)
+			var q *Question
+			err = json.Unmarshal([]byte(event.Query), q)
+			if err != nil {
+				fmt.Println("failed to unmarshal", "qustion", event.Query, "error", err.Error())
+			}
 
-			if validation == 1 {
+			req := new(dns.Msg)
+			req.SetQuestion(q.Name, q.Qtype)
+
+			resp, err := dns.Exchange(req, "127.0.0.1:"+chainConfig.Bind)
+			if err != nil {
+				fmt.Println("query validation failed", "req", req.String())
+			}
+			fmt.Println("successfully query validation", "resp", resp.String())
+
+			query := event.Query
+			verify_answer := resp.Answer
+			original_answer := fabricItem.Answer
+
+			result, _ := compareAnswer(original_answer, verify_answer)
+			if result == "true" {
 				_, err = contract.SubmitTransaction("Vote", query, event.TxID, "yes")
 				if err != nil {
 					fmt.Printf("failed to submit VoteTrue transaction to fabric: %s", err.Error())
@@ -289,4 +281,52 @@ func ReadChainCfg() sdnsCfg.ChainCfg {
 	}
 
 	return chainConfig
+}
+
+// -------TODO: 目前匹配方法只针对A或者AAAA记录查询，并且只匹配超过三分之一相同就行
+func compareAnswer(str1 []RR, str2 []dns.RR) (string, error) {
+	var ip_str1 []string
+	var ip_str2 []string
+
+	for _, v := range str1 {
+		if v.Type == dns.TypeA || v.Type == dns.TypeAAAA {
+			ip_str1 = append(ip_str1, v.Data)
+		}
+
+	}
+
+	for _, v := range str2 {
+		if v.Header().Rrtype == dns.TypeA || v.Header().Rrtype == dns.TypeAAAA {
+			ip_str2 = append(ip_str2, strings.TrimPrefix(v.String(), v.Header().String()))
+		}
+	}
+
+	if len(ip_str1) == 0 && len(ip_str2) == 0 {
+		return "true", nil
+	} else if len(ip_str1) == 0 || len(ip_str2) == 0 {
+		return "false", nil
+	}
+
+	m := make(map[string]byte)
+	var inter int
+
+	for _, v := range ip_str1 {
+		m[v] = 0
+	}
+
+	for _, v := range ip_str2 {
+		if _, ok := m[v]; ok {
+			inter++
+		}
+	}
+
+	// 判断相同记录数量
+	if inter < int(math.Ceil(float64(len(ip_str1))/3)) && inter < int(math.Ceil(float64(len(ip_str2))/3)) {
+		log.Info(" compareAnswer: records are not euqal", ip_str1, ip_str2)
+
+		return "false", nil
+	} else {
+		return "true", nil
+	}
+
 }
