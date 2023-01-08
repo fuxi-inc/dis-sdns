@@ -175,7 +175,7 @@ func (f *FabricService) LoadConfig(confs ...string) error {
 			}
 
 			// ----TODO: 查询验证------
-			var q *Question
+			q := new(Question)
 			err = json.Unmarshal([]byte(event.Query), q)
 			if err != nil {
 				fmt.Println("failed to unmarshal", "qustion", event.Query, "error", err.Error())

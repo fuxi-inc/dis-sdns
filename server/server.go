@@ -189,10 +189,10 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 			log.Warn("failed to evaluate", "question", string(questionJSON), "item", string(itemAsBytes))
 		}
 
-		var result *verifyresult
+		result := new(verifyresult)
 		err = json.Unmarshal(resultAsBytes, result)
 		if err != nil {
-			log.Warn("failed to unmarshal", "question", string(questionJSON), "item", string(itemAsBytes))
+			log.Warn("failed to unmarshal", "result", string(resultAsBytes))
 			return
 		}
 
