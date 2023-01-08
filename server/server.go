@@ -156,6 +156,11 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	res := w.Msg()
 	q := res.Question[0]
 
+	if strings.Contains(q.Name, "_dis_test") {
+		log.Info("validation query ", "qname", q.Name)
+		return
+	}
+
 	// query verification ；目前只针对A记录
 	if (q.Qtype == dns.TypeA || q.Qtype == dns.TypeAAAA) && fabCon {
 

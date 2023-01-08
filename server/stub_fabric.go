@@ -182,11 +182,13 @@ func (f *FabricService) LoadConfig(confs ...string) error {
 			}
 
 			req := new(dns.Msg)
+			q.Name = "_dis_test." + q.Name
+
 			req.SetQuestion(q.Name, q.Qtype)
 
 			resp, err := dns.Exchange(req, "127.0.0.1:"+chainConfig.Bind)
 			if err != nil {
-				fmt.Println("query validation failed", "req", req.String())
+				fmt.Println("query validation failed", "req", req.String(), "error", err.Error())
 			}
 			fmt.Println("successfully query validation", "resp", resp.String())
 
