@@ -140,6 +140,10 @@ func (f *FabricService) LoadConfig(confs ...string) error {
 	go func() {
 		for e := range notifier {
 
+			fmt.Printf("Receive cc event, ccid: %v \neventName: %v\n"+
+				"payload: %v \ntxid: %v \nblock: %v \nsourceURL: %v\n",
+				e.ChaincodeID, e.EventName, string(e.Payload), e.TxID, e.BlockNumber, e.SourceURL)
+
 			event := new(validationEvent)
 			err := json.Unmarshal(e.Payload, event)
 			if err != nil {
@@ -160,10 +164,6 @@ func (f *FabricService) LoadConfig(confs ...string) error {
 			if !found {
 				continue
 			}
-
-			fmt.Printf("Receive cc event, ccid: %v \neventName: %v\n"+
-				"payload: %v \ntxid: %v \nblock: %v \nsourceURL: %v\n",
-				e.ChaincodeID, e.EventName, string(e.Payload), e.TxID, e.BlockNumber, e.SourceURL)
 
 			itemAsBytes := []byte(event.Item)
 
