@@ -69,8 +69,6 @@ func New(cfg *config.Config) *Server {
 // ServeDNS implements the Handle interface.
 func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 
-	log.Info("receive dns msg", "msg", r.String())
-
 	q := r.Question[0]
 
 	var query_validation bool
@@ -82,6 +80,8 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 
 		query_validation = true
 	}
+
+	log.Info("receive dns msg", "msg", r.String())
 
 	// if fabCon {
 	// 	// 查询区块链
@@ -169,7 +169,7 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 		return
 	}
 
-	res := w.Msg()                                       
+	res := w.Msg()
 
 	// query verification ；目前只针对A记录
 	if (q.Qtype == dns.TypeA || q.Qtype == dns.TypeAAAA) && fabCon {
