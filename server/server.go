@@ -71,6 +71,18 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 
 	log.Info("receive dns msg", "msg", r.String())
 
+	q := r.Question[0]
+
+	var query_validation bool
+	if strings.Contains(q.Name, "_dis_test") {
+		log.Info("validation query ", "qname", q.Name)
+
+		name := strings.TrimPrefix(q.Name, "_dis_test.")
+		r.Question[0].Name = name
+
+		query_validation = true
+	}
+
 	// if fabCon {
 	// 	// 查询区块链
 	// 	q := r.Question[0]
@@ -153,13 +165,11 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	// 	}
 	// }
 
-	res := w.Msg()
-	q := res.Question[0]
-
-	if strings.Contains(q.Name, "_dis_test") {
-		log.Info("validation query ", "qname", q.Name)
+	if query_validation {
 		return
 	}
+
+	res := w.Msg()
 
 	// query verification ；目前只针对A记录
 	if (q.Qtype == dns.TypeA || q.Qtype == dns.TypeAAAA) && fabCon {
