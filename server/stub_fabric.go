@@ -198,6 +198,8 @@ func (f *FabricService) LoadConfig(confs ...string) error {
 
 				fmt.Printf("Successfully Submit VoteFalse transaction to fabric: %s\n", event.TxID)
 
+				continue
+
 			} else {
 				fmt.Println("successfully query validation", "resp", resp.String())
 			}

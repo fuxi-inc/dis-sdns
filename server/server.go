@@ -71,7 +71,7 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 
 	q := r.Question[0]
 
-	var query_validation bool
+	var query_validation bool      
 	if strings.Contains(q.Name, "_dis_test") {
 		log.Info("validation query ", "qname", q.Name)
 
