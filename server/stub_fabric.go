@@ -139,9 +139,9 @@ func (f *FabricService) LoadConfig(confs ...string) error {
 	go func() {
 		for e := range notifier {
 
-			fmt.Printf("Receive cc event, ccid: %v \neventName: %v\n"+
-				"payload: %v \ntxid: %v \nblock: %v \nsourceURL: %v\n",
-				e.ChaincodeID, e.EventName, string(e.Payload), e.TxID, e.BlockNumber, e.SourceURL)
+			// fmt.Printf("Receive cc event, ccid: %v \neventName: %v\n"+
+			// 	"payload: %v \ntxid: %v \nblock: %v \nsourceURL: %v\n",
+			// 	e.ChaincodeID, e.EventName, string(e.Payload), e.TxID, e.BlockNumber, e.SourceURL)
 
 			event := new(validationEvent)
 			err := json.Unmarshal(e.Payload, event)
@@ -185,13 +185,23 @@ func (f *FabricService) LoadConfig(confs ...string) error {
 
 			req.SetQuestion(q.Name, q.Qtype)
 
+			query := event.Query
 			resp, err := dns.Exchange(req, "127.0.0.1:"+chainConfig.Bind)
 			if err != nil {
-				fmt.Println("query validation failed", "req", req.String(), "error", err.Error())
-			}
-			fmt.Println("successfully query validation", "resp", resp.String())
+				fmt.Println("query validation failed", "resp", resp.String(), "error", err.Error())
 
-			query := event.Query
+				_, err = contract.SubmitTransaction("Vote", query, event.TxID, "no")
+				if err != nil {
+					fmt.Printf("failed to submit VoteFalse transaction to fabric: %s", err.Error())
+					continue
+				}
+
+				fmt.Printf("Successfully Submit VoteFalse transaction to fabric: %s\n", event.TxID)
+
+			} else {
+				fmt.Println("successfully query validation", "resp", resp.String())
+			}
+
 			verify_answer := resp.Answer
 			original_answer := fabricItem.Answer
 

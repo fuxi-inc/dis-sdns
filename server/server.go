@@ -169,7 +169,7 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 		return
 	}
 
-	res := w.Msg()
+	res := w.Msg()                                       
 
 	// query verification ；目前只针对A记录
 	if (q.Qtype == dns.TypeA || q.Qtype == dns.TypeAAAA) && fabCon {
