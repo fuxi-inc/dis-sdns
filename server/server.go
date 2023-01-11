@@ -71,7 +71,7 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 
 	q := r.Question[0]
 
-	var query_validation bool      
+	var query_validation bool
 	if strings.Contains(q.Name, "_dis_test") {
 		log.Info("validation query ", "qname", q.Name)
 
@@ -211,12 +211,6 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 			return
 		}
 
-		// if updating transaction
-		if result.Result == "collision" {
-			i_new.Validation = "updating"
-			i_new.Update_txid = result.Update_txid
-		}
-
 		if result.Result == "verified" {
 			// 验证通过， 直接返回
 			// -----TODO: 添加返回信息-----
@@ -224,6 +218,13 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 			return
 		} else {
 			go func() {
+
+				// if updating transaction
+				if result.Result == "collision" {
+					i_new.Validation = "updating"
+					i_new.Update_txid = result.Update_txid
+				}
+
 				txID, err := i_new.setRR(string(questionJSON), s.service)
 				if err != nil {
 					return

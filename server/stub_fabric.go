@@ -187,12 +187,12 @@ func (f *FabricService) LoadConfig(confs ...string) error {
 
 			query := event.Query
 			resp, err := dns.Exchange(req, "127.0.0.1:"+chainConfig.Bind)
-			if err != nil {
+			if err != nil {  
 				fmt.Println("query validation failed", "resp", resp.String(), "error", err.Error())
 
 				_, err = contract.SubmitTransaction("Vote", query, event.TxID, "no")
 				if err != nil {
-					fmt.Printf("failed to submit VoteFalse transaction to fabric: %s", err.Error())
+					fmt.Printf("failed to submit VoteFalse transaction to fabric: %s\n", err.Error())
 					continue
 				}
 
@@ -211,7 +211,7 @@ func (f *FabricService) LoadConfig(confs ...string) error {
 			if result == "true" {
 				_, err = contract.SubmitTransaction("Vote", query, event.TxID, "yes")
 				if err != nil {
-					fmt.Printf("failed to submit VoteTrue transaction to fabric: %s", err.Error())
+					fmt.Printf("failed to submit VoteTrue transaction to fabric: %s\n", err.Error())
 					continue
 				}
 
@@ -219,7 +219,7 @@ func (f *FabricService) LoadConfig(confs ...string) error {
 			} else {
 				_, err = contract.SubmitTransaction("Vote", query, event.TxID, "no")
 				if err != nil {
-					fmt.Printf("failed to submit VoteFalse transaction to fabric: %s", err.Error())
+					fmt.Printf("failed to submit VoteFalse transaction to fabric: %s\n", err.Error())
 					continue
 				}
 
