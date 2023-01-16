@@ -45,7 +45,7 @@ func New(cfg *config.Config) *DNSHandler {
 }
 
 // Name return middleware name
-func (h *DNSHandler) Name() string { return name + h.cfg.BindDOH + h.cfg.ForwarderServers[0] }
+func (h *DNSHandler) Name() string { return name }
 
 // ServeDNS implements the Handle interface.
 func (h *DNSHandler) ServeDNS(ctx context.Context, ch *middleware.Chain) {
@@ -58,7 +58,7 @@ func (h *DNSHandler) ServeDNS(ctx context.Context, ch *middleware.Chain) {
 	split := dns.SplitDomainName(name)
 
 	// 检索dis域，直接通过forwarder
-	if len(split) > 1 && (split[len(split)-2] == "data" || split[len(split)-2] == "user") {
+	if len(split) > 0{
 		log.Info("forwarding req", "name", name)
 		ch.Next(ctx)
 		return
