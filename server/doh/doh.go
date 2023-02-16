@@ -169,7 +169,7 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Server", "SDNS")
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 		// 查询数据标识地址
 		if strings.Contains(path, "data/address") {
