@@ -19,7 +19,7 @@ import (
 	"github.com/semihalev/sdns/middleware"
 )
 
-// Resolver type
+// Resolver type“
 type Resolver struct {
 	ncache *authcache.NSCache
 
@@ -143,7 +143,7 @@ func (r *Resolver) parseOutBoundAddrs(cfg *config.Config) {
 func (r *Resolver) Resolve(ctx context.Context, req *dns.Msg, servers *authcache.AuthServers, root bool, depth int, level int, nomin bool, parentdsrr []dns.RR, extra ...bool) (*dns.Msg, error) {
 	q := req.Question[0]
 
-	// log.Info("resolve domain req", "length", len(req.Question), "Name", req.Question[0].Name, "Type", req.Question[0].Qtype)
+	// log.Info("test resolve domain req", "length", len(req.Question), "Name", req.Question[0].Name, "Type", req.Question[0].Qtype)
 
 	if root {
 		servers, parentdsrr, level = r.searchCache(q, req.CheckingDisabled, q.Name)
@@ -189,6 +189,8 @@ func (r *Resolver) Resolve(ctx context.Context, req *dns.Msg, servers *authcache
 		return resp, nil
 	}
 
+	// log.Info("test2", "resp", resp.String())
+
 	if !minimized && len(resp.Answer) > 0 {
 		// this is like auth server external cname error but this can be recover.
 		if resp.Rcode == dns.RcodeServerFailure && len(resp.Answer) > 0 {
@@ -202,10 +204,14 @@ func (r *Resolver) Resolve(ctx context.Context, req *dns.Msg, servers *authcache
 		return r.answer(ctx, req, resp, parentdsrr, extra...)
 	}
 
+	// log.Info("test0", "qname", resp.Question[0].Name)
+
 	if minimized && (len(resp.Answer) == 0 && len(resp.Ns) == 0) || len(resp.Answer) > 0 {
 		level++
 		return r.Resolve(ctx, req, servers, false, depth, level, nomin, parentdsrr)
 	}
+
+	// log.Info("test1", "qname", resp.Question[0].Name)
 
 	if len(resp.Ns) > 0 {
 		if minimized {
@@ -372,6 +378,8 @@ func (r *Resolver) Resolve(ctx context.Context, req *dns.Msg, servers *authcache
 
 		return r.Resolve(ctx, req, authservers, false, depth, nlevel, nomin, parentdsrr)
 	}
+
+	// log.Info("test3", "qname", req.Question[0].Name)
 
 	// no answer, no authority. create new msg safer, sometimes received weird responses
 	m := new(dns.Msg)
@@ -791,6 +799,7 @@ func (r *Resolver) answer(ctx context.Context, req, resp *dns.Msg, parentdsrr []
 		q := req.Question[0]
 
 		signer, signerFound := r.findRRSIG(resp, q.Name, true)
+		log.Info("test dnssec answer", "qname", q.Name)
 		if !signerFound && len(parentdsrr) > 0 && q.Qtype == dns.TypeDS {
 			log.Warn("DNSSEC verify failed (answer)", "query", formatQuestion(q), "error", errDSRecords.Error())
 			return nil, errDSRecords
@@ -823,6 +832,8 @@ func (r *Resolver) authority(ctx context.Context, req, resp *dns.Msg, parentdsrr
 		q := req.Question[0]
 
 		signer, signerFound := r.findRRSIG(resp, q.Name, false)
+		log.Info("test dnssec authority", "qname", q.Name)
+
 		if !signerFound && len(parentdsrr) > 0 && otype == dns.TypeDS {
 			log.Warn("DNSSEC verify failed (NXDOMAIN)", "query", formatQuestion(q), "error", errDSRecords.Error())
 

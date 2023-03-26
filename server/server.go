@@ -145,6 +145,9 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	// 	}
 	// }
 
+	l.SetFlags(l.Ltime | l.Lmicroseconds)
+	l.Println("Start handling", q.Name)
+
 	ch := s.chainPool.Get().(*middleware.Chain)
 
 	ch.Reset(w, r)
@@ -153,6 +156,7 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 
 	s.chainPool.Put(ch)
 
+	l.Println("Stop handling", q.Name)
 	log.Info("dns response msg", "res", w.Msg())
 
 	// -------TODO: ignore repeate msg ----
@@ -358,7 +362,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // Run listen the services
 func (s *Server) Run() {
 	go s.ListenAndServeDNS("udp")
-	// go s.ListenAndServeDNS("tcp")
+	go s.ListenAndServeDNS("tcp")
 	go s.ListenAndServeDNSTLS()
 	go s.ListenAndServeHTTP()
 }
@@ -368,16 +372,16 @@ func (s *Server) Run() {
 func (s *Server) ListenAndServeDNS(network string) {
 	log.Info("DNS server listening...", "net", network, "addr", s.addr)
 
-	if network == "udp" {
-		srv, err := NewChainService(ChainTypeFabric, "")
-		if srv == nil || err != nil {
-			log.Info("cannot connect fabric contract, use traditional cache instead")
-			fabCon = false
-		} else {
-			log.Info("cache successfully connect to fabric contract")
-		}
-		s.service = srv
-	}
+	// if network == "udp" {
+	// 	srv, err := NewChainService(ChainTypeFabric, "")
+	// 	if srv == nil || err != nil {
+	// 		log.Info("cannot connect fabric contract, use traditional cache instead")
+	// 		fabCon = false
+	// 	} else {
+	// 		log.Info("cache successfully connect to fabric contract")
+	// 	}
+	// 	s.service = srv
+	// }
 
 	server := &dns.Server{
 		Addr:          s.addr,

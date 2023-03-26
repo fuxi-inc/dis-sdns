@@ -2,6 +2,7 @@ package resolver
 
 import (
 	"context"
+	l "log"
 	"os"
 	"time"
 
@@ -55,19 +56,25 @@ func (h *DNSHandler) ServeDNS(ctx context.Context, ch *middleware.Chain) {
 	q := req.Question[0]
 
 	name := dns.Fqdn(q.Name)
-	split := dns.SplitDomainName(name)
+	// split := dns.SplitDomainName(name)
 
-	// 检索dis域，直接通过forwarder
-	if len(split) > 1 && (split[len(split)-2] == "data" || split[len(split)-2] == "user") {
-		log.Info("forwarding req", "name", name)
-		ch.Next(ctx)
-		return
-	}
+	// // 检索dis域，直接通过forwarder
+	// if len(split) > 1 && (split[len(split)-2] == "data" || split[len(split)-2] == "user") {
+	// 	log.Info("forwarding req", "name", name)
+	// 	ch.Next(ctx)
+	// 	return
+	// }
 
 	if v := ctx.Value(ctxKey("reqid")); v == nil {
 		ctx = context.WithValue(ctx, ctxKey("reqid"), req.Id)
 	}
+
+	l.SetFlags(l.Ltime | l.Lmicroseconds)
+	l.Println("Start recursive resolve", name)
+
 	msg := h.handle(ctx, req)
+
+	l.Println("Finish recursive resolve", name)
 
 	_ = w.WriteMsg(msg)
 }

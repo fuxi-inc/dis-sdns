@@ -1,4 +1,4 @@
-fabcon: "true"
+fabcon: "false"
 validators_account: "2"
 voters_account: "1"
 channel: "mychannel"
