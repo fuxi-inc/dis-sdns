@@ -1,4 +1,4 @@
-fabcon: "true"
+fabcon: "false"
 validation_account: "1"
 channel: "mychannel"
 chaincode_dis: "dis_resolver"

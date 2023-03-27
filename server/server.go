@@ -140,7 +140,6 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 
 	// log.Info("dns response msg", "res", w.Msg())
 	res := w.Msg()
-	q := res.Question[0]
 
 	mt, _ := response.Typify(res, s.now().UTC())
 
@@ -148,6 +147,8 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	duration := computeTTL(msgTTL, dnsutil.MinimalDefaultTTL, dnsutil.MaximumDefaulTTL)
 
 	if fabCon && duration >= 30 {
+		q := res.Question[0]
+
 		go func() {
 			// 构造fabric key
 			question := Question{
