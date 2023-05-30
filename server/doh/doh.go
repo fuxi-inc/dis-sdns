@@ -1253,9 +1253,22 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
             a := msg.Answer[0]
 
             tmp := strings.TrimPrefix(a.String(), a.Header().String())
+            slice := strings.Split(tmp, " ")
+            if len(slice) != 4 {
+
+                // Message: "失败：无法从结果RR中获取identitiy公钥",
+                json, _ := json.Marshal(errmsg.PublicKeyNotFoundError)
+                w.WriteHeader(http.StatusNotFound)
+                _, _ = w.Write(json)
+
+                log.Info("failed to split the identity userkey from the answer RR", "answer", tmp)
+                return
+            }
+
+            pK := slice[3]
 
             var maps = make(map[string]interface{})
-            maps["encryption_key"] = tmp
+            maps["encryption_key"] = pK
 
             json, err := json.Marshal(errmsg.OK.WithData(maps))
             if err != nil {
@@ -1303,7 +1316,7 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
                 w.WriteHeader(http.StatusNotFound)
                 _, _ = w.Write(json)
 
-                log.Info("failed to find the encryption_key", "data_identifier", dataid)
+                log.Info("failed to find the encryption_key", "data_identifier", dataid, msg)
                 return
             }
             a := msg.Answer[0]
