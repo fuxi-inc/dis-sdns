@@ -1264,9 +1264,20 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 			a := msg.Answer[0]
 
 			tmp := strings.TrimPrefix(a.String(), a.Header().String())
+			slice := strings.Split(tmp, " ")
+			if len(slice) != 4 {
+
+				// 失败：无法从结果RR中获取用户公钥
+				json, _ := json.Marshal(errmsg.PublicKeyNotFoundError)
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write(json)
+
+				log.Info("failed to split the public-key from the answer RR", "answer", tmp)
+				return
+			}
 
 			var maps = make(map[string]interface{})
-			maps["encryption_key"] = tmp
+			maps["encryption_key"] = slice[3]
 
 			json, err := json.Marshal(errmsg.OK.WithData(maps))
 			if err != nil {
