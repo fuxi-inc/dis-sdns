@@ -171,25 +171,30 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 		w.Header().Set("Server", "SDNS")
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
-		// 查询数据标识地址
-		if strings.Contains(path, "data/address") {
-			dataid := r.URL.Query().Get("data_identifier")
-			if dataid == "" {
-				json, _ := json.Marshal(errmsg.PathParamError)
-				w.WriteHeader(http.StatusBadRequest)
-				_, _ = w.Write(json)
+		// 总体查询
+		doi := r.URL.Query().Get("doi")
+		body := r.URL.Query().Get("type")
 
-				log.Info("failed to get data_identifier", "url", r.URL.String())
-				return
-			}
-			dataid = dns.Fqdn(dataid)
+		if doi == "" {
+			json, _ := json.Marshal(errmsg.PathParamError)
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write(json)
 
-			log.Info("receive query data address", "data_identifier", dataid)
+			log.Info("failed to get doi from query path", "url", r.URL.String())
+			return
+		}
+
+		// 查询Do地址dar
+		if strings.Contains(body, "dar") {
+
+			doi = dns.Fqdn(doi)
+
+			log.Info("receive query data address", "doi", doi)
 
 			qtype := dns.TypeURI
 
 			req := new(dns.Msg)
-			req.SetQuestion(dataid, qtype)
+			req.SetQuestion(doi, qtype)
 			req.SetEdns0(4096, false)
 			// req.AuthenticatedData = true
 
@@ -209,7 +214,7 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 				w.WriteHeader(http.StatusNotFound)
 				_, _ = w.Write(json)
 
-				log.Info("failed to find the dataAddress", "data_identifier", dataid)
+				log.Info("failed to find the dataAddress", "doi", doi)
 				return
 			}
 			a := msg.Answer[0]
@@ -229,7 +234,7 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 			tmp = strings.Trim(slice[2], "\"")
 
 			var maps = make(map[string]interface{})
-			maps["data_address"] = tmp
+			maps["dar"] = tmp
 
 			// 成功
 			json, err := json.Marshal(errmsg.OK.WithData(maps))
@@ -240,26 +245,17 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 
 			_, _ = w.Write(json)
 
-		} else if strings.Contains(path, "users/public-key") {
-			userid := r.URL.Query().Get("identity_identifier")
-			if userid == "" {
+			// 查询公钥
+		} else if strings.Contains(body, "pubkey") {
 
-				// 失败：无法从路径query参数中获取userid
-				json, _ := json.Marshal(errmsg.PathParamError)
-				w.WriteHeader(http.StatusBadRequest)
-				_, _ = w.Write(json)
+			doi = dns.Fqdn(doi)
 
-				log.Info("failed to get userid", "url", r.URL.String())
-				return
-			}
-			userid = dns.Fqdn(userid)
-
-			log.Info("receive query user key", "userid", userid)
+			log.Info("receive query pub key", "doi", doi)
 
 			qtype := dns.TypeCERT
 
 			req := new(dns.Msg)
-			req.SetQuestion(userid, qtype)
+			req.SetQuestion(doi, qtype)
 			req.SetEdns0(4096, false)
 			// req.AuthenticatedData = true
 
@@ -279,7 +275,7 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 				w.WriteHeader(http.StatusNotFound)
 				_, _ = w.Write(json)
 
-				log.Info("failed to find the public-key", "identity_identifier", userid)
+				log.Info("failed to find the pub-key", "doi", doi)
 				return
 			}
 			a := msg.Answer[0]

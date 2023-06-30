@@ -26,6 +26,8 @@ type UserCredential struct {
 
 func handleDISTest(w http.ResponseWriter, r *http.Request) {
 	handle := func(req *dns.Msg) *dns.Msg {
+
+		// TODO: 改权威地址
 		msg, _ := dns.Exchange(req, "106.14.192.31:5301")
 
 		return msg
@@ -34,7 +36,7 @@ func handleDISTest(w http.ResponseWriter, r *http.Request) {
 	var handleFn func(http.ResponseWriter, *http.Request)
 
 	log.Info("URL Path", r.URL.Path)
-	if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "dis-query") {
+	if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "DataObject") {
 		handleFn = HandleDISQuery(handle)
 	} else if r.Method == http.MethodGet && r.URL.Query().Get("dns") == "" {
 		handleFn = HandleJSON(handle)
@@ -44,44 +46,6 @@ func handleDISTest(w http.ResponseWriter, r *http.Request) {
 
 	handleFn(w, r)
 }
-
-// func getAuthorization(userid string, dataid string) (string, error) {
-
-// 	buserid := base32.StdEncoding.EncodeToString(hash([]byte(userid)))
-
-// 	w := httptest.NewRecorder()
-
-// 	request, err := http.NewRequest("GET", "/dis-query/auth?dataid="+buserid+"."+dataid, nil)
-// 	if err != nil {
-// 		return "", err
-// 	}
-
-// 	request.RemoteAddr = "127.0.0.1:0"
-
-// 	handleDISTest(w, request)
-
-// 	if w.Code != http.StatusOK {
-// 		return "", errors.New("failed to query the authorization TXT: " + buserid + "." + dataid)
-// 	}
-
-// 	data, err := ioutil.ReadAll(w.Body)
-// 	if err != nil {
-// 		return "", err
-// 	}
-
-// 	var au AuthMsg
-// 	err = json.Unmarshal(data, &au)
-// 	if err != nil {
-// 		return "", err
-// 	}
-
-// 	if au.Auth != "" {
-// 		return au.Auth, nil
-// 	} else {
-// 		return "", errors.New("failed to find the authorization TXT: " + buserid + "." + dataid)
-// 	}
-
-// }
 
 func importPublicKey(pubKey string) (*rsa.PublicKey, error) {
 
