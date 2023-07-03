@@ -615,6 +615,7 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 			_, _ = w.Write(json)
 
 			return
+
 		} else {
 			// 成功，返回map
 			json, err := json.Marshal(errmsg.OK.WithData(maps))
