@@ -163,7 +163,7 @@ func HandleJSON(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *http.
 // HandleDIS handle dis query request
 func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path
+		// path := r.URL.Path
 
 		// returnMsg := new(errmsg.err)
 
@@ -175,14 +175,18 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 		doi := r.URL.Query().Get("doi")
 		body := r.URL.Query().Get("type")
 
+		// 查询参数缺失
 		if doi == "" {
-			json, _ := json.Marshal(errmsg.PathParamError)
+			json, _ := json.Marshal(errmsg.ErrnoDoiParamsError)
 			w.WriteHeader(http.StatusBadRequest)
 			_, _ = w.Write(json)
 
-			log.Info("failed to get doi from query path", "url", r.URL.String())
+			log.Info("failed to get doi from query url", "url", r.URL.String())
 			return
 		}
+
+		// 响应结果
+		var maps = make(map[string]interface{})
 
 		// 查询Do地址dar
 		if strings.Contains(body, "dar") {
@@ -200,7 +204,7 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 
 			msg := handle(req)
 			if msg == nil {
-				json, _ := json.Marshal(errmsg.DomainResolutionError)
+				json, _ := json.Marshal(errmsg.ErrnoDomainResolutionError)
 				w.WriteHeader(http.StatusBadRequest)
 				_, _ = w.Write(json)
 
@@ -210,7 +214,7 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 
 			if len(msg.Answer) == 0 {
 				// 数据标识地址不存在
-				json, _ := json.Marshal(errmsg.DataAddressNotFoundError)
+				json, _ := json.Marshal(errmsg.ErrnoDarNotFoundError)
 				w.WriteHeader(http.StatusNotFound)
 				_, _ = w.Write(json)
 
@@ -223,7 +227,7 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 			slice := strings.Split(tmp, " ")
 			if len(slice) != 3 {
 				// 无法从结果RR中获取数据地址
-				json, _ := json.Marshal(errmsg.DataAddressNotFoundError)
+				json, _ := json.Marshal(errmsg.ErrnoDarNotFoundError)
 				w.WriteHeader(http.StatusNotFound)
 				_, _ = w.Write(json)
 
@@ -233,20 +237,12 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 
 			tmp = strings.Trim(slice[2], "\"")
 
-			var maps = make(map[string]interface{})
 			maps["dar"] = tmp
 
-			// 成功
-			json, err := json.Marshal(errmsg.OK.WithData(maps))
-			if err != nil {
-				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-				return
-			}
+		}
 
-			_, _ = w.Write(json)
-
-			// 查询公钥
-		} else if strings.Contains(body, "pubkey") {
+		// 查询公钥pubkey
+		if strings.Contains(body, "pubkey") {
 
 			doi = dns.Fqdn(doi)
 
@@ -262,7 +258,7 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 			msg := handle(req)
 			if msg == nil {
 				// 失败：DNS解析无结果
-				json, _ := json.Marshal(errmsg.DomainResolutionError)
+				json, _ := json.Marshal(errmsg.ErrnoDomainResolutionError)
 				w.WriteHeader(http.StatusBadRequest)
 				_, _ = w.Write(json)
 
@@ -271,7 +267,7 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 			}
 
 			if len(msg.Answer) == 0 {
-				json, _ := json.Marshal(errmsg.PublicKeyNotFoundError)
+				json, _ := json.Marshal(errmsg.ErrnoPubkeyNotFoundError)
 				w.WriteHeader(http.StatusNotFound)
 				_, _ = w.Write(json)
 
@@ -285,7 +281,7 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 			if len(slice) != 4 {
 
 				// 失败：无法从结果RR中获取用户公钥
-				json, _ := json.Marshal(errmsg.PublicKeyNotFoundError)
+				json, _ := json.Marshal(errmsg.ErrnoPubkeyNotFoundError)
 				w.WriteHeader(http.StatusNotFound)
 				_, _ = w.Write(json)
 
@@ -294,111 +290,26 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 			}
 
 			var maps = make(map[string]interface{})
-			maps["public_key"] = slice[3]
+			maps["pubkey"] = slice[3]
 
-			json, err := json.Marshal(errmsg.OK.WithData(maps))
-			if err != nil {
-				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-				return
-			}
+		}
 
-			_, _ = w.Write(json)
+		// 查询数据所有者
+		if strings.Contains(body, "owner") {
 
-		} else if strings.Contains(path, "users/pod") {
-			userid := r.URL.Query().Get("identity_identifier")
-			if userid == "" {
-				// 失败：无法从路径query参数中获取identity_identifier
-				json, _ := json.Marshal(errmsg.PathParamError)
-				w.WriteHeader(http.StatusBadRequest)
-				_, _ = w.Write(json)
+			doi = dns.Fqdn(doi)
 
-				log.Info("failed to get identity_identifier", "url", r.URL.String())
-				return
-			}
-			userid = dns.Fqdn(userid)
-
-			log.Info("receive query pod address", "userid", userid)
-
-			qtype := dns.TypeURI
-
-			req := new(dns.Msg)
-			req.SetQuestion(userid, qtype)
-			req.SetEdns0(4096, false)
-			// req.AuthenticatedData = true
-
-			msg := handle(req)
-			if msg == nil {
-
-				// 失败：DNS解析无结果
-				json, _ := json.Marshal(errmsg.DomainResolutionError)
-				w.WriteHeader(http.StatusBadRequest)
-				_, _ = w.Write(json)
-
-				log.Info("failed to handle the request", "req", req)
-				return
-			}
-
-			if len(msg.Answer) == 0 {
-
-				// 失败：pod地址不存在
-				json, _ := json.Marshal(errmsg.PodNotFoundError)
-				w.WriteHeader(http.StatusNotFound)
-				_, _ = w.Write(json)
-
-				log.Info("failed to find the pod address", "identity_identifier", userid)
-				return
-			}
-			a := msg.Answer[0]
-
-			tmp := strings.TrimPrefix(a.String(), a.Header().String())
-			slice := strings.Split(tmp, " ")
-			if len(slice) != 3 {
-				// 失败：无法从结果RR中获取pod地址
-				json, _ := json.Marshal(errmsg.PodNotFoundError)
-				w.WriteHeader(http.StatusNotFound)
-				_, _ = w.Write(json)
-
-				log.Info("failed to split the podAddress from the answer RR", "answer", tmp)
-				return
-			}
-
-			tmp = strings.Trim(slice[2], "\"")
-
-			var maps = make(map[string]interface{})
-			maps["pod_address"] = tmp
-
-			json, err := json.Marshal(errmsg.OK.WithData(maps))
-			if err != nil {
-				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-				return
-			}
-
-			_, _ = w.Write(json)
-
-		} else if strings.Contains(path, "data/owner") {
-			dataid := r.URL.Query().Get("data_identifier")
-			if dataid == "" {
-				// 失败：无法从路径query参数中获取dataid
-				json, _ := json.Marshal(errmsg.PathParamError)
-				w.WriteHeader(http.StatusBadRequest)
-				_, _ = w.Write(json)
-
-				log.Info("failed to get dataid", "url", r.URL.String())
-				return
-			}
-			dataid = dns.Fqdn(dataid)
-
-			log.Info("receive query data address", "dataid", dataid)
+			log.Info("receive query do owner", "doi", doi)
 
 			qtype := dns.TypeRP
 
 			req := new(dns.Msg)
-			req.SetQuestion(dataid, qtype)
+			req.SetQuestion(doi, qtype)
 			req.SetEdns0(4096, false)
 
 			msg := handle(req)
 			if msg == nil {
-				json, _ := json.Marshal(errmsg.DomainResolutionError)
+				json, _ := json.Marshal(errmsg.ErrnoDomainResolutionError)
 				w.WriteHeader(http.StatusBadRequest)
 				_, _ = w.Write(json)
 
@@ -408,11 +319,11 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 
 			if len(msg.Answer) == 0 {
 
-				json, _ := json.Marshal(errmsg.OwnerNotFoundError)
+				json, _ := json.Marshal(errmsg.ErrnoOwnerNotFoundError)
 				w.WriteHeader(http.StatusNotFound)
 				_, _ = w.Write(json)
 
-				log.Info("failed to find the ownerID", "dataid", dataid)
+				log.Info("failed to find the ownerID", "doi", doi)
 				return
 			}
 			a := msg.Answer[0]
@@ -421,7 +332,7 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 			slice := strings.Split(tmp, " ")
 			if len(slice) != 2 {
 
-				json, _ := json.Marshal(errmsg.OwnerNotFoundError)
+				json, _ := json.Marshal(errmsg.ErrnoOwnerNotFoundError)
 				w.WriteHeader(http.StatusNotFound)
 				_, _ = w.Write(json)
 
@@ -434,7 +345,7 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 			tmp2 := strings.Split(tmp, "data")
 			if len(tmp2) > 2 {
 				// 失败：无法从结果全名中截取到所有者ID
-				json, _ := json.Marshal(errmsg.OwnerNotFoundError)
+				json, _ := json.Marshal(errmsg.ErrnoOwnerNotFoundError)
 				w.WriteHeader(http.StatusNotFound)
 				_, _ = w.Write(json)
 
@@ -442,45 +353,34 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 				return
 			}
 
-			var maps = make(map[string]interface{})
-			maps["owner_identity_identifier"] = tmp2[0]
+			maps["owner"] = tmp2[0]
 
-			json, err := json.Marshal(errmsg.OK.WithData(maps))
-			if err != nil {
-				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-				return
-			}
+		}
 
-			_, _ = w.Write(json)
+		// 查询权属auth
+		if strings.Contains(body, "auth") {
 
-		} else if strings.Contains(path, "authorization/info") {
-			dataid := r.URL.Query().Get("data_identifier")
+			doi = dns.Fqdn(doi)
 
-			if dataid == "" {
-				// 失败：无法从路径query参数中获取dataid
-				json, _ := json.Marshal(errmsg.PathParamError)
+			// 获取权属对象doi
+			dudoi := r.URL.Query().Get("dudoi")
+			if dudoi == "" {
+				// 失败：无法从路径query参数中获取dudoi
+				json, _ := json.Marshal(errmsg.ErrnoDudoiParamsError)
 				w.WriteHeader(http.StatusBadRequest)
 				_, _ = w.Write(json)
 
-				log.Info("failed to get dataid", "url", r.URL.String())
-				return
-			}
-			dataid = dns.Fqdn(dataid)
-
-			creatorid := r.URL.Query().Get("creator_identity_identifier")
-			if creatorid == "" {
-				// 失败：无法从路径query参数中获取creatorid(哈希+编码之后)
-				json, _ := json.Marshal(errmsg.PathParamError)
-				w.WriteHeader(http.StatusBadRequest)
-				_, _ = w.Write(json)
-
-				log.Info("failed to get creatorid", "url", r.URL.String())
+				log.Info("failed to get dudoi", "url", r.URL.String())
 				return
 			}
 
-			log.Info("receive query authorization info", "dataid", dataid, "creatorid", creatorid)
+			log.Info("receive query auth info", "doi", doi, "dudoi", dudoi)
 
-			request := creatorid + "." + dataid
+			// 对dudoi哈希
+			// TODO: 检查hash是否正确
+			hash := Hash([]byte(dudoi))
+
+			request := string(hash) + "." + doi
 
 			qtype := dns.TypeTXT
 
@@ -493,7 +393,7 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 			msg := handle(req)
 			if msg == nil {
 				// 失败：DNS解析无结果
-				json, _ := json.Marshal(errmsg.DomainResolutionError)
+				json, _ := json.Marshal(errmsg.ErrnoDomainResolutionError)
 				w.WriteHeader(http.StatusBadRequest)
 				_, _ = w.Write(json)
 
@@ -501,12 +401,9 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 				return
 			}
 
-			// log.Info("msg", msg.String())
-			// log.Info("len", len(msg.Answer))
-
 			if len(msg.Answer) == 0 {
 				// 失败：授权TXT记录不存在
-				json, _ := json.Marshal(errmsg.AuthInfoNotFoundError)
+				json, _ := json.Marshal(errmsg.ErrnoAuthNotFoundError)
 				w.WriteHeader(http.StatusNotFound)
 				_, _ = w.Write(json)
 
@@ -518,7 +415,7 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 			tmp := strings.TrimPrefix(a.String(), a.Header().String())
 			if tmp == "" {
 				// 失败：无法从结果RR中获取数据授权信息TXT记录
-				json, _ := json.Marshal(errmsg.AuthInfoNotFoundError)
+				json, _ := json.Marshal(errmsg.ErrnoAuthNotFoundError)
 				w.WriteHeader(http.StatusNotFound)
 				_, _ = w.Write(json)
 
@@ -526,41 +423,25 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 				return
 			}
 
-			var maps = make(map[string]interface{})
-			maps["authorization_info"] = tmp
+			maps["auth"] = tmp
 
-			json, err := json.Marshal(errmsg.OK.WithData(maps))
-			if err != nil {
-				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-				return
-			}
+		}
 
-			_, _ = w.Write(json)
+		// 查询数据摘要digest
+		if strings.Contains(body, "digest") {
 
-		} else if strings.Contains(path, "data/digest") {
-			dataid := r.URL.Query().Get("data_identifier")
-
-			if dataid == "" {
-				// 失败：无法从路径query参数中获取dataid
-				json, _ := json.Marshal(errmsg.PathParamError)
-				w.WriteHeader(http.StatusBadRequest)
-				_, _ = w.Write(json)
-
-				log.Info("failed to get dataid", "url", r.URL.String())
-				return
-			}
-			dataid = dns.Fqdn(dataid)
+			doi = dns.Fqdn(doi)
 
 			qtype := dns.TypeTXT
 
 			req := new(dns.Msg)
-			req.SetQuestion(dataid, qtype)
+			req.SetQuestion(doi, qtype)
 			req.SetEdns0(4096, false)
 
 			msg := handle(req)
 			if msg == nil {
 				// 失败：DNS解析无结果
-				json, _ := json.Marshal(errmsg.DomainResolutionError)
+				json, _ := json.Marshal(errmsg.ErrnoDomainResolutionError)
 				w.WriteHeader(http.StatusBadRequest)
 				_, _ = w.Write(json)
 
@@ -573,11 +454,11 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 
 			if len(msg.Answer) == 0 {
 				// 失败：数据摘要TXT记录不存在
-				json, _ := json.Marshal(errmsg.DataDigestNotFoundError)
+				json, _ := json.Marshal(errmsg.ErrnoDigestNotFoundError)
 				w.WriteHeader(http.StatusNotFound)
 				_, _ = w.Write(json)
 
-				log.Info("failed to find the data digesat TXT", "dataid", dataid)
+				log.Info("failed to find the data digesat TXT", "dataid")
 				return
 			}
 			// a := msg.Answer[0]
@@ -597,7 +478,7 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 			// tmp := strings.TrimPrefix(a.String(), a.Header().String())
 			if tmp == "" {
 				// 失败：无法从结果RR中获取数据摘要TXT记录
-				json, _ := json.Marshal(errmsg.DataDigestNotFoundError)
+				json, _ := json.Marshal(errmsg.ErrnoDigestNotFoundError)
 				w.WriteHeader(http.StatusNotFound)
 				_, _ = w.Write(json)
 
@@ -605,44 +486,26 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 				return
 			}
 
-			var maps = make(map[string]interface{})
-			maps["data_digest"] = tmp
+			maps["digest"] = tmp
 
-			json, err := json.Marshal(errmsg.OK.WithData(maps))
-			if err != nil {
-				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-				return
-			}
+		}
 
-			_, _ = w.Write(json)
+		// 查询数据分类分级
+		if strings.Contains(body, "classgrade") {
 
-		} else if strings.Contains(path, "hub/address") {
-			//TODO
-			domain := r.URL.Query().Get("domain")
+			doi = dns.Fqdn(doi)
 
-			if domain == "" {
-				//无法从路径query参数中获取domain
-				json, _ := json.Marshal(errmsg.PathParamError)
-				w.WriteHeader(http.StatusBadRequest)
-				_, _ = w.Write(json)
+			qtype := dns.TypeTXT
 
-				log.Info("failed to get domain", "url", r.URL.String())
-				return
-			}
-			domain = dns.Fqdn(domain)
-
-			domain = "_hub_http." + domain
-
-			qtype := dns.TypeSRV
-
+			// 查询分级grade
 			req := new(dns.Msg)
-			req.SetQuestion(domain, qtype)
+			req.SetQuestion("_grading."+doi, qtype)
 			req.SetEdns0(4096, false)
 
 			msg := handle(req)
 			if msg == nil {
 				// 失败：DNS解析无结果
-				json, _ := json.Marshal(errmsg.DomainResolutionError)
+				json, _ := json.Marshal(errmsg.ErrnoDomainResolutionError)
 				w.WriteHeader(http.StatusBadRequest)
 				_, _ = w.Write(json)
 
@@ -650,598 +513,53 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 				return
 			}
 
+			// log.Info("msg", msg.String())
+			// log.Info("len", len(msg.Answer))
+
 			if len(msg.Answer) == 0 {
-				// 失败：域SRV记录不存在
-				json, _ := json.Marshal(errmsg.DataDigestNotFoundError)
+				// 失败：数据分级TXT记录不存在
+				json, _ := json.Marshal(errmsg.ErrnoGradeNotFoundError)
 				w.WriteHeader(http.StatusNotFound)
 				_, _ = w.Write(json)
 
-				log.Info("failed to find the domain SRV", "domain", domain)
+				log.Info("failed to find the data grade", "doi", doi)
 				return
 			}
-			a := msg.Answer[0]
-
-			tmp := strings.TrimPrefix(a.String(), a.Header().String())
-			if tmp == "" {
-				// 失败：无法从结果RR中获取域SRV记录
-				json, _ := json.Marshal(errmsg.DataDigestNotFoundError)
-				w.WriteHeader(http.StatusNotFound)
-				_, _ = w.Write(json)
-
-				log.Info("failed to split the SRV from the answer RR", "answer", tmp)
-				return
-			}
-
-			str := strings.Split(tmp, " ")
-			tmp = str[len(str)-1]
-
-			var maps = make(map[string]interface{})
-			maps["hub_address"] = tmp
-
-			json, err := json.Marshal(errmsg.OK.WithData(maps))
-			if err != nil {
-				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-				return
-			}
-
-			_, _ = w.Write(json)
-
-		} else if strings.Contains(path, "authorization/authentication") {
-			id := r.URL.Query().Get("data_identifier")
-			if id == "" {
-				// 失败：无法从路径query参数中获取dataid
-				json, _ := json.Marshal(errmsg.PathParamError)
-				w.WriteHeader(http.StatusBadRequest)
-				_, _ = w.Write(json)
-
-				log.Info("failed to get dataid", "url", r.URL.String())
-				return
-			}
-			stid := dns.Fqdn(id)
-
-			rec := r.URL.Query().Get("identity_identifier")
-
-			log.Info("get access userid", "rec", rec)
-
-			if rec == "" {
-				// 失败：无法从路径query参数中获取userid
-				json, _ := json.Marshal(errmsg.PathParamError)
-				w.WriteHeader(http.StatusBadRequest)
-				_, _ = w.Write(json)
-
-				log.Info("failed to get view user id", "url", r.URL.String())
-				return
-			}
-			// strec := dns.Fqdn(rec)
-
-			// // 从header中获取pod签名
-			// sign := r.Header.Get("Authorization")
-			// if sign == "" {
-			// 	// 失败：无法从请求Header中获取签名
-			// 	json, _ := json.Marshal(errmsg.PathParamError)
-			// 	w.WriteHeader(http.StatusBadRequest)
-			// 	_, _ = w.Write(json)
-
-			// 	log.Info("failed to get the pod signature", "sign", sign)
-			// 	return
-			// }
-
-			// args := strings.Split(sign, " ")
-			// if len(args) != 2 {
-			// 	// 失败：Authorization字段不符合规范
-			// 	json, _ := json.Marshal(errmsg.ParamFormatError)
-			// 	w.WriteHeader(http.StatusBadRequest)
-			// 	_, _ = w.Write(json)
-
-			// 	log.Info("failed to split signature", "sign", sign)
-			// 	return
-			// }
-
-			// // 截取pod签名
-			// podSignature, err := base64.StdEncoding.DecodeString(args[1])
-			// if podSignature == nil || err != nil {
-			// 	// 失败：pod签名base64解码失败
-			// 	json, _ := json.Marshal(errmsg.SignDecodeError)
-			// 	w.WriteHeader(http.StatusBadRequest)
-			// 	_, _ = w.Write(json)
-
-			// 	log.Info("failed to decode pod signature", "err", err.Error(), "sign", args[1])
-			// 	return
-			// }
-
-			// 获取数据标识对应身份（pod）标识
-			// qtype := dns.TypeRP
-
-			// req := new(dns.Msg)
-			// req.SetQuestion(stid, qtype)
-			// req.SetEdns0(4096, false)
-
-			// msg := handle(req)
-			// if msg == nil {
-			// 	// 失败：DNS解析无结果
-			// 	json, _ := json.Marshal(errmsg.DomainResolutionError)
-			// 	w.WriteHeader(http.StatusBadRequest)
-			// 	_, _ = w.Write(json)
-
-			// 	log.Info("failed to handle the request 2", "req", req)
-			// 	return
-			// }
-
-			// if len(msg.Answer) == 0 {
-			// 	// 失败：所有者标识不存在
-			// 	json, _ := json.Marshal(errmsg.OwnerNotFoundError)
-			// 	w.WriteHeader(http.StatusNotFound)
-			// 	_, _ = w.Write(json)
-
-			// 	log.Info("failed to find the ownerID", "dataid", stid)
-			// 	return
-			// }
 			// a := msg.Answer[0]
 
-			// tmp := strings.TrimPrefix(a.String(), a.Header().String())
-			// log.Info("tmp", tmp)
+			tmp := ""
+			for _, rr := range msg.Answer {
+				record, isType := rr.(*dns.TXT)
+				if isType {
+					// logger.Get().Infof("%v", record.Txt[0])
 
-			// slice := strings.Split(tmp, " ")
-			// if len(slice) != 2 {
-			// 	// 失败：无法从结果RR中获取所有者标识
-			// 	json, _ := json.Marshal(errmsg.OwnerNotFoundError)
-			// 	w.WriteHeader(http.StatusNotFound)
-			// 	_, _ = w.Write(json)
+					for _, slice := range record.Txt {
+						tmp = tmp + slice
+					}
+				}
+			}
 
-			// 	log.Info("failed to split the ownerID from the answer RR", "answer", tmp)
-			// 	return
-			// }
-
-			// tmp = strings.Trim(slice[0], "\"")
-
-			// tmp2 := strings.Split(tmp, "data")
-			// if len(tmp2) > 2 {
-			// 	// 失败：无法从结果全名中截取到所有者ID
-			// 	json, _ := json.Marshal(errmsg.OwnerNotFoundError)
-			// 	w.WriteHeader(http.StatusNotFound)
-			// 	_, _ = w.Write(json)
-
-			// 	log.Info("failed to split the ownerID from the whole name", "answer", tmp)
-			// 	return
-			// }
-
-			// owner := tmp2[0]
-
-			// 获取strategy数据标识，如果permission为public，直接返回true
-			st_dataid := "_strategy." + stid
-
-			qtype := dns.TypeTXT
-
-			req := new(dns.Msg)
-			req.SetQuestion(st_dataid, qtype)
-
-			msg := handle(req)
-			if msg == nil {
-				// 失败：解析授权TXT记录时，DNS解析无结果
-				json, _ := json.Marshal(errmsg.DomainResolutionError)
-				w.WriteHeader(http.StatusBadRequest)
+			if tmp == "" {
+				// 失败：无法从结果RR中获取数据分级TXT记录
+				json, _ := json.Marshal(errmsg.ErrnoGradeNotFoundError)
+				w.WriteHeader(http.StatusNotFound)
 				_, _ = w.Write(json)
 
-				log.Info("failed to handle the request: strategy data TXT", "req", req)
+				log.Info("failed to split the grade TXT from the answer RR", "answer", tmp)
 				return
 			}
 
-			if len(msg.Answer) != 0 {
-				a := msg.Answer[0]
-				tmp := strings.TrimPrefix(a.String(), a.Header().String())
-				if tmp != "" {
-					if strings.Contains(tmp, "public") {
-						var maps = make(map[string]interface{})
-						maps["authorization_info"] = "true"
+			maps["digest"] = tmp
 
-						json, err := json.Marshal(errmsg.OK.WithData(maps))
-						if err != nil {
-							http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-							return
-						}
-
-						_, _ = w.Write(json)
-
-						return
-					}
-				}
-
-			}
-
-			// // 获取pod所有者公钥
-			// qtype = dns.TypeCERT
-
-			// req = new(dns.Msg)
-			// req.SetQuestion(owner, qtype)
-			// req.SetEdns0(4096, false)
-
-			// msg = handle(req)
-			// if msg == nil {
-			// 	// 失败：解析授权TXT记录时，DNS解析无结果
-			// 	json, _ := json.Marshal(errmsg.DomainResolutionError)
-			// 	w.WriteHeader(http.StatusBadRequest)
-			// 	_, _ = w.Write(json)
-
-			// 	log.Info("failed to handle the request 3", "req", req)
-			// 	return
-			// }
-
-			// if len(msg.Answer) == 0 {
-
-			// 	// 失败：POD所有者公钥不存在
-			// 	json, _ := json.Marshal(errmsg.PublicKeyNotFoundError)
-			// 	w.WriteHeader(http.StatusNotFound)
-			// 	_, _ = w.Write(json)
-
-			// 	log.Info("failed to find the userkey2", "userid", owner)
-			// 	return
-			// }
-			// a = msg.Answer[0]
-
-			// tmp = strings.TrimPrefix(a.String(), a.Header().String())
-			// slice = strings.Split(tmp, " ")
-			// if len(slice) != 4 {
-			// 	// 失败：无法从结果RR中获取POD所有者公钥
-			// 	json, _ := json.Marshal(errmsg.PublicKeyNotFoundError)
-			// 	w.WriteHeader(http.StatusNotFound)
-			// 	_, _ = w.Write(json)
-
-			// 	log.Info("failed to split the userkey from the answer RR", "answer", tmp)
-			// 	return
-			// }
-
-			// pK := slice[3]
-
-			// // 转换公钥格式
-			// publicKey, err := importPublicKey(pK)
-			// if err != nil {
-			// 	// 失败：无法将公钥转换为rsa.PublicKey
-			// 	json, _ := json.Marshal(errmsg.UserKeyImportError)
-			// 	w.WriteHeader(http.StatusInternalServerError)
-			// 	_, _ = w.Write(json)
-
-			// 	log.Info("failed to transfer to rsa.Publickey", "err", err.Error())
-			// 	return
-			// }
-
-			// // 验证pod所有者签名
-			// err = verifySignature(publicKey, hash([]byte(id+rec)), podSignature)
-			// if err != nil {
-			// 	// Message: "失败：POD所有者签名验证未通过
-			// 	json, _ := json.Marshal(errmsg.AuthFailError)
-			// 	w.WriteHeader(http.StatusUnauthorized)
-			// 	_, _ = w.Write(json)
-
-			// 	log.Info("failed to verify the pod signature", "err", err.Error(), "id", id, "rec", rec, "sign", args[1], "pubkey", pK)
-			// 	return
-			// }
-
-			// 验证授权(获取授权TXT记录)
-
-			buserid := rec
-
-			qtype = dns.TypeTXT
-
+			// 查询class
 			req = new(dns.Msg)
-			request := buserid + "." + stid
-
-			log.Info("auth request", "request", request)
-
-			req.SetQuestion(request, qtype)
+			req.SetQuestion("_classification."+doi, qtype)
 			req.SetEdns0(4096, false)
 
 			msg = handle(req)
 			if msg == nil {
-				// Message: "失败：授权TXT记录DNS解析无结果，授权验证未通过",
-				json, _ := json.Marshal(errmsg.PermissionError)
-				w.WriteHeader(http.StatusForbidden)
-				_, _ = w.Write(json)
-
-				log.Info("failed to handle the request", "req", req)
-				return
-			}
-
-			if len(msg.Answer) == 0 {
-				// Message: "失败：授权TXT记录不存在，授权验证未通过",
-				json, _ := json.Marshal(errmsg.PermissionError)
-				w.WriteHeader(http.StatusForbidden)
-				_, _ = w.Write(json)
-
-				log.Info("failed to find the authorization TXT", "authid", request)
-				return
-			}
-			a := msg.Answer[0]
-
-			tmp := strings.TrimPrefix(a.String(), a.Header().String())
-			if tmp == "" {
-
-				// Message: "失败：无法从结果RR中获取授权TXT记录，授权验证未通过",
-				json, _ := json.Marshal(errmsg.PermissionError)
-				w.WriteHeader(http.StatusForbidden)
-				_, _ = w.Write(json)
-
-				log.Info("failed to split the authorization TXT from the answer RR", "answer", tmp)
-				return
-			}
-
-			var maps = make(map[string]interface{})
-			maps["authorization_info"] = tmp
-
-			json, err := json.Marshal(errmsg.OK.WithData(maps))
-			if err != nil {
-				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-				return
-			}
-
-			_, _ = w.Write(json)
-
-		} else if strings.Contains(path, "data/authentication") {
-			dataid := r.URL.Query().Get("data_identifier")
-			if dataid == "" {
-				// Message: "失败：无法从路径query参数中获取dataid"
-				json, _ := json.Marshal(errmsg.PathParamError)
-				w.WriteHeader(http.StatusBadRequest)
-				_, _ = w.Write(json)
-
-				log.Info("failed to get dataid", "url", r.URL.String())
-				return
-			}
-			dataid = dns.Fqdn(dataid)
-
-			dataDigest := r.URL.Query().Get("data_digest")
-			if dataDigest == "" {
-				// Message: "失败：无法从路径query参数中获取dataDigest",
-				json, _ := json.Marshal(errmsg.PathParamError)
-				w.WriteHeader(http.StatusBadRequest)
-				_, _ = w.Write(json)
-
-				log.Info("failed to get dataDigest", "url", r.URL.String())
-				return
-			}
-
-			// 获取数据完整性记录
-			qtype := dns.TypeTXT
-
-			req := new(dns.Msg)
-			req.SetQuestion(dataid, qtype)
-			req.SetEdns0(4096, false)
-
-			msg := handle(req)
-			if msg == nil {
-				// Message: "失败：DNS解析无结果",
-				json, _ := json.Marshal(errmsg.DomainResolutionError)
-				w.WriteHeader(http.StatusBadRequest)
-				_, _ = w.Write(json)
-
-				log.Info("failed to handle the request", "req", req)
-				return
-			}
-
-			if len(msg.Answer) == 0 {
-
-				// Message: "失败：数据TXT记录不存在",
-				json, _ := json.Marshal(errmsg.DataDigestNotFoundError)
-				w.WriteHeader(http.StatusNotFound)
-				_, _ = w.Write(json)
-
-				log.Info("failed to find the data TXT", "dataid", dataid)
-				return
-			}
-			a := msg.Answer[0]
-
-			tmp := strings.TrimPrefix(a.String(), a.Header().String())
-			if tmp == "" {
-				// Message: "失败：无法从结果RR中获取数据TXT记录"
-				json, _ := json.Marshal(errmsg.DataDigestNotFoundError)
-				w.WriteHeader(http.StatusNotFound)
-				_, _ = w.Write(json)
-
-				log.Info("failed to split the data TXT from the answer RR", "answer", tmp)
-				return
-			}
-			tmp = strings.Trim(tmp, "\"")
-
-			// 判断摘要是否相同
-			if tmp != dataDigest {
-
-				// Message: "失败：摘要不匹配，完整性验证未通过",
-				json, _ := json.Marshal(errmsg.PermissionError)
-				w.WriteHeader(http.StatusForbidden)
-				_, _ = w.Write(json)
-
-				log.Info("integrity authentication failed", "tmp", tmp, "dataDigest", dataDigest)
-				return
-			}
-
-			var maps = make(map[string]interface{})
-			maps["pass"] = true
-
-			json, err := json.Marshal(errmsg.OK.WithData(maps))
-			if err != nil {
-				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-				return
-			}
-
-			_, _ = w.Write(json)
-
-		} else if strings.Contains(path, "users/authentication") {
-			id := r.URL.Query().Get("identity_identifier")
-			if id == "" {
-
-				// Message: "失败：无法从路径query参数中获取userid",
-				json, _ := json.Marshal(errmsg.PathParamError)
-				w.WriteHeader(http.StatusBadRequest)
-				_, _ = w.Write(json)
-
-				log.Info("failed to get userid", "url", r.URL.String())
-				return
-			}
-			stid := dns.Fqdn(id)
-
-			//从header中获取签名
-			sign := r.Header.Get("Authorization")
-			if sign == "" {
-
-				// Message: "失败：无法从请求Header中获取identity签名",
-				json, _ := json.Marshal(errmsg.PathParamError)
-				w.WriteHeader(http.StatusBadRequest)
-				_, _ = w.Write(json)
-
-				log.Info("failed to get the identity signature", "sign", sign)
-				return
-			}
-
-			args := strings.Split(sign, " ")
-			if len(args) != 2 {
-
-				// Message: "失败：无法从Authorization中截取identity签名",
-				json, _ := json.Marshal(errmsg.ParamFormatError)
-				w.WriteHeader(http.StatusBadRequest)
-				_, _ = w.Write(json)
-
-				log.Info("failed to get the identity signature", "sign", sign)
-				return
-			}
-
-			signature, err := base64.StdEncoding.DecodeString(args[1])
-			if signature == nil || err != nil {
-				// Message: "失败：identity签名base64解码失败",
-				json, _ := json.Marshal(errmsg.SignDecodeError)
-				w.WriteHeader(http.StatusInternalServerError)
-				_, _ = w.Write(json)
-
-				log.Info("failed to decode identity signature", "err", err.Error())
-				return
-			}
-
-			// 获取identity公钥
-			qtype := dns.TypeCERT
-
-			req := new(dns.Msg)
-			req.SetQuestion(stid, qtype)
-			req.SetEdns0(4096, false)
-
-			msg := handle(req)
-			if msg == nil {
-				// Message: "失败：获取identity公钥时，DNS解析无结果"
-				json, _ := json.Marshal(errmsg.DomainResolutionError)
-				w.WriteHeader(http.StatusBadRequest)
-				_, _ = w.Write(json)
-
-				log.Info("failed to handle the identity cert request ", "req", req)
-				return
-			}
-
-			if len(msg.Answer) == 0 {
-
-				// Message: "失败：identity公钥不存在",
-				json, _ := json.Marshal(errmsg.PublicKeyNotFoundError)
-				w.WriteHeader(http.StatusNotFound)
-				_, _ = w.Write(json)
-
-				log.Info("failed to find the identity userkey", "userid", id)
-				return
-			}
-			a := msg.Answer[0]
-
-			tmp := strings.TrimPrefix(a.String(), a.Header().String())
-			slice := strings.Split(tmp, " ")
-			if len(slice) != 4 {
-
-				// Message: "失败：无法从结果RR中获取identitiy公钥",
-				json, _ := json.Marshal(errmsg.PublicKeyNotFoundError)
-				w.WriteHeader(http.StatusNotFound)
-				_, _ = w.Write(json)
-
-				log.Info("failed to split the identity userkey from the answer RR", "answer", tmp)
-				return
-			}
-
-			pK := slice[3]
-
-			// 转换公钥格式
-			publicKey, err := importPublicKey(pK)
-			if err != nil {
-
-				// Message: "失败：无法将公钥转换为rsa.PublicKey",
-				json, _ := json.Marshal(errmsg.UserKeyImportError)
-				w.WriteHeader(http.StatusInternalServerError)
-				_, _ = w.Write(json)
-
-				log.Info("failed to transfer to rsa.Publickey", "err", err.Error())
-				return
-			}
-
-			// 构造签名struct
-			authSign := &AuthIdentitySign{
-				ID: id,
-			}
-
-			signAsBytes, err := json.Marshal(authSign)
-			if err != nil {
-
-				// Message: "marshal签名体失败",
-				json, _ := json.Marshal(errmsg.MarshalError)
-				w.WriteHeader(http.StatusInternalServerError)
-				_, _ = w.Write(json)
-
-				log.Info("failed to marshal the body for identity auth sign", "err", err.Error())
-				return
-			}
-
-			// 验证identity所有者签名
-			err = verifySignature(publicKey, hash(signAsBytes), signature)
-			if err != nil {
-
-				var maps = make(map[string]interface{})
-				maps["pass"] = false
-
-				// Message: "失败：identity所有者签名验证未通过",
-				json, _ := json.Marshal(errmsg.AuthFailError)
-				w.WriteHeader(http.StatusUnauthorized)
-				_, _ = w.Write(json)
-
-				log.Info("failed to verify the identity signature", "err", err.Error())
-				return
-			}
-
-			var maps = make(map[string]interface{})
-			maps["pass"] = true
-
-			json, err := json.Marshal(errmsg.OK.WithData(maps))
-			if err != nil {
-				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-				return
-			}
-
-			_, _ = w.Write(json)
-
-		} else if strings.Contains(path, "data/encryption_key") {
-			dataid := r.URL.Query().Get("data_identifier")
-			if dataid == "" {
-				// 失败：无法从路径query参数中获取userid
-				json, _ := json.Marshal(errmsg.PathParamError)
-				w.WriteHeader(http.StatusBadRequest)
-				_, _ = w.Write(json)
-
-				log.Info("failed to get dataid", "url", r.URL.String())
-				return
-			}
-			dataid = dns.Fqdn(dataid)
-
-			log.Info("receive query data key", "dataid", dataid)
-
-			qtype := dns.TypeCERT
-
-			req := new(dns.Msg)
-			req.SetQuestion(dataid, qtype)
-			req.SetEdns0(4096, false)
-			// req.AuthenticatedData = true
-
-			msg := handle(req)
-			if msg == nil {
 				// 失败：DNS解析无结果
-				json, _ := json.Marshal(errmsg.DomainResolutionError)
+				json, _ := json.Marshal(errmsg.ErrnoDomainResolutionError)
 				w.WriteHeader(http.StatusBadRequest)
 				_, _ = w.Write(json)
 
@@ -1249,103 +567,64 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 				return
 			}
 
-			if len(msg.Answer) == 0 {
-				json, _ := json.Marshal(errmsg.DataEncryptionKeyNotFoundError)
-				w.WriteHeader(http.StatusNotFound)
-				_, _ = w.Write(json)
-
-				log.Info("failed to find the encryption_key", "data_identifier", dataid)
-				return
-			}
-			a := msg.Answer[0]
-
-			tmp := strings.TrimPrefix(a.String(), a.Header().String())
-			slice := strings.Split(tmp, " ")
-			if len(slice) != 4 {
-
-				// 失败：无法从结果RR中获取用户公钥
-				json, _ := json.Marshal(errmsg.PublicKeyNotFoundError)
-				w.WriteHeader(http.StatusNotFound)
-				_, _ = w.Write(json)
-
-				log.Info("failed to split the public-key from the answer RR", "answer", tmp)
-				return
-			}
-
-			var maps = make(map[string]interface{})
-			maps["encryption_key"] = slice[3]
-
-			json, err := json.Marshal(errmsg.OK.WithData(maps))
-			if err != nil {
-				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-				return
-			}
-
-			_, _ = w.Write(json)
-
-		} else if strings.Contains(path, "policy/content") {
-			dataid := r.URL.Query().Get("policy_identifier")
-			if dataid == "" {
-				// 失败：无法从路径query参数中获取userid
-				json, _ := json.Marshal(errmsg.PathParamError)
-				w.WriteHeader(http.StatusBadRequest)
-				_, _ = w.Write(json)
-
-				log.Info("failed to get dataid", "url", r.URL.String())
-				return
-			}
-			dataid = dns.Fqdn(dataid)
-
-			log.Info("receive query data key", "dataid", dataid)
-
-			qtype := dns.TypeTXT
-
-			req := new(dns.Msg)
-			req.SetQuestion(dataid, qtype)
-			req.SetEdns0(4096, false)
-			// req.AuthenticatedData = true
-
-			msg := handle(req)
-			if msg == nil {
-				// 失败：DNS解析无结果
-				json, _ := json.Marshal(errmsg.DomainResolutionError)
-				w.WriteHeader(http.StatusBadRequest)
-				_, _ = w.Write(json)
-
-				log.Info("failed to handle the request", "req", req)
-				return
-			}
+			// log.Info("msg", msg.String())
+			// log.Info("len", len(msg.Answer))
 
 			if len(msg.Answer) == 0 {
-				json, _ := json.Marshal(errmsg.DataEncryptionKeyNotFoundError)
+				// 失败：数据分类TXT记录不存在
+				json, _ := json.Marshal(errmsg.ErrnoClassNotFoundError)
 				w.WriteHeader(http.StatusNotFound)
 				_, _ = w.Write(json)
 
-				log.Info("failed to find the encryption_key", "data_identifier", dataid)
+				log.Info("failed to find the data classification TXT", "doi", doi)
 				return
 			}
-			a := msg.Answer[0]
+			// a := msg.Answer[0]
 
-			tmp := strings.TrimPrefix(a.String(), a.Header().String())
+			tmp = ""
+			for _, rr := range msg.Answer {
+				record, isType := rr.(*dns.TXT)
+				if isType {
+					// logger.Get().Infof("%v", record.Txt[0])
 
-			var maps = make(map[string]interface{})
-			maps["content"] = tmp
+					for _, slice := range record.Txt {
+						tmp = tmp + slice
+					}
+				}
+			}
 
-			json, err := json.Marshal(errmsg.OK.WithData(maps))
-			if err != nil {
-				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			if tmp == "" {
+				// 失败：无法从结果RR中获取数据分类TXT记录
+				json, _ := json.Marshal(errmsg.ErrnoClassNotFoundError)
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write(json)
+
+				log.Info("failed to split the data class TXT from the answer RR", "answer", tmp)
 				return
 			}
 
-			_, _ = w.Write(json)
+			maps["class"] = tmp
 
-		} else {
-			// Message: "失败：路径错误",
-			json, _ := json.Marshal(errmsg.PathError)
+		}
+
+		// 查询内容为空
+		if len(maps) == 0 {
+			// Message: "失败：路径错误，没有有效查询",
+			json, _ := json.Marshal(errmsg.ErrnoTypeParamsError)
 			w.WriteHeader(http.StatusBadRequest)
 			_, _ = w.Write(json)
 
 			return
+		} else {
+			// 成功，返回map
+			json, err := json.Marshal(errmsg.OK.WithData(maps))
+			if err != nil {
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				return
+			}
+
+			_, _ = w.Write(json)
+
 		}
 
 	}
