@@ -410,9 +410,21 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 				log.Info("failed to find the authorization info TXT", "request", request)
 				return
 			}
-			a := msg.Answer[0]
+			// a := msg.Answer[0]
 
-			tmp := strings.TrimPrefix(a.String(), a.Header().String())
+			tmp := ""
+			for _, rr := range msg.Answer {
+				record, isType := rr.(*dns.TXT)
+				if isType {
+					// logger.Get().Infof("%v", record.Txt[0])
+
+					for _, slice := range record.Txt {
+						tmp = tmp + slice
+					}
+				}
+			}
+
+			// tmp := strings.TrimPrefix(a.String(), a.Header().String())
 			if tmp == "" {
 				// 失败：无法从结果RR中获取数据授权信息TXT记录
 				json, _ := json.Marshal(errmsg.ErrnoAuthNotFoundError)
@@ -549,7 +561,7 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 				return
 			}
 
-			maps["digest"] = tmp
+			maps["grade"] = tmp
 
 			// 查询class
 			req = new(dns.Msg)
