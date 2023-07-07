@@ -203,8 +203,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	var handlerFn func(http.ResponseWriter, *http.Request)
 
-	// log.Info("URL Path", r.URL.Path)
-	if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "dis-query") {
+	log.Info("URL Path", r.URL.Path)
+
+	if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "DataObject") {
 		handlerFn = doh.HandleDISQuery(handle)
 	} else if r.Method == http.MethodGet && r.URL.Query().Get("dns") == "" {
 		handlerFn = doh.HandleJSON(handle)
