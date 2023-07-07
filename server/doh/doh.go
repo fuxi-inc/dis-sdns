@@ -383,7 +383,9 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 			// TODO: 检查hash是否正确
 			hash := Hash([]byte(dudoi))
 
-			request := string(hash) + "." + doi
+			encodedString := base64.StdEncoding.EncodeToString(hash)
+
+			request := encodedString + "." + doi
 
 			qtype := dns.TypeTXT
 
