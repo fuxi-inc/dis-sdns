@@ -442,6 +442,8 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 
 			maps["auth"] = tmp
 
+			log.Info("test-auth", tmp)
+
 		}
 
 		// 查询数据摘要digest
