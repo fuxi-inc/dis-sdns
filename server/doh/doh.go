@@ -417,6 +417,8 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 			}
 			// a := msg.Answer[0]
 
+			log.Info("test-", msg.Answer[0].String())
+
 			tmp := ""
 			for _, rr := range msg.Answer {
 				record, isType := rr.(*dns.TXT)
