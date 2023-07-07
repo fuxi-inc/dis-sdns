@@ -417,7 +417,7 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 			}
 			// a := msg.Answer[0]
 
-			log.Info("test-", msg.Answer[0].String())
+			// log.Info("test-", msg.Answer[0].String())
 
 			tmp := ""
 			for _, rr := range msg.Answer {
@@ -427,6 +427,7 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 					// logger.Get().Infof("%v", record.Txt[0])
 
 					for _, slice := range record.Txt {
+						log.Info("test-slice", slice)
 						tmp = tmp + slice
 					}
 				}
