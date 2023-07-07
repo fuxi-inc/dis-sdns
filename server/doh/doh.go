@@ -293,7 +293,6 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 			}
 
 			log.Info("test-pubkey:", slice[3])
-			var maps = make(map[string]interface{})
 			maps["pubkey"] = slice[3]
 
 		}
