@@ -107,6 +107,12 @@ func (c *Cache) ServeDNS(ctx context.Context, ch *middleware.Chain) {
 		return
 	}
 
+	// 判断是否不查缓存
+	if req.Zero {
+		ch.Next(ctx)
+		return
+	}
+
 	// check purge query
 	if q.Qclass == dns.ClassCHAOS && q.Qtype == dns.TypeNULL {
 		if qname, qtype, ok := dnsutil.ParsePurgeQuestion(req); ok {
@@ -121,6 +127,7 @@ func (c *Cache) ServeDNS(ctx context.Context, ch *middleware.Chain) {
 		return
 	}
 
+	// req.Zero = 0
 	if q.Name != "." && !req.RecursionDesired {
 		ch.CancelWithRcode(dns.RcodeServerFailure, false)
 

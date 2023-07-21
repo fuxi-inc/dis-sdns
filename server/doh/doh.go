@@ -164,7 +164,7 @@ func HandleJSON(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *http.
 func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		log.Info("test 111111")
+		// log.Info("test 111111")
 
 		// path := r.URL.Path
 
@@ -177,6 +177,7 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 		// 总体查询
 		doi := r.URL.Query().Get("doi")
 		body := r.URL.Query().Get("type")
+		direct := r.URL.Query().Get("direct_query")
 
 		// 查询参数缺失
 		if doi == "" {
@@ -204,6 +205,11 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 			req.SetQuestion(doi, qtype)
 			req.SetEdns0(4096, false)
 			// req.AuthenticatedData = true
+
+			// 设置不查缓存
+			if direct == "true" || direct == "TRUE" {
+				req.Zero = true
+			}
 
 			msg := handle(req)
 			if msg == nil {
@@ -258,6 +264,11 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 			req.SetEdns0(4096, false)
 			// req.AuthenticatedData = true
 
+			// 设置不查缓存
+			if direct == "true" || direct == "TRUE" {
+				req.Zero = true
+			}
+
 			msg := handle(req)
 			if msg == nil {
 				// 失败：DNS解析无结果
@@ -309,6 +320,11 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 			req := new(dns.Msg)
 			req.SetQuestion(doi, qtype)
 			req.SetEdns0(4096, false)
+
+			// 设置不查缓存
+			if direct == "true" || direct == "TRUE" {
+				req.Zero = true
+			}
 
 			msg := handle(req)
 			if msg == nil {
@@ -395,6 +411,11 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 
 			// req.AuthenticatedData = true
 
+			// 设置不查缓存
+			if direct == "true" || direct == "TRUE" {
+				req.Zero = true
+			}
+
 			msg := handle(req)
 			if msg == nil {
 				// 失败：DNS解析无结果
@@ -446,7 +467,7 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 
 			maps["auth"] = tmp
 
-			log.Info("test-auth", tmp)
+			// log.Info("test-auth", tmp)
 
 		}
 
@@ -460,6 +481,11 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 			req := new(dns.Msg)
 			req.SetQuestion(doi, qtype)
 			req.SetEdns0(4096, false)
+
+			// 设置不查缓存
+			if direct == "true" || direct == "TRUE" {
+				req.Zero = true
+			}
 
 			msg := handle(req)
 			if msg == nil {
@@ -524,6 +550,11 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 			req := new(dns.Msg)
 			req.SetQuestion("_grading."+doi, qtype)
 			req.SetEdns0(4096, false)
+
+			// 设置不查缓存
+			if direct == "true" || direct == "TRUE" {
+				req.Zero = true
+			}
 
 			msg := handle(req)
 			if msg == nil {

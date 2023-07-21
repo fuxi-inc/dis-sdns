@@ -222,3 +222,39 @@ func Test_Server(t *testing.T) {
 	os.Remove(cert)
 	os.Remove(privkey)
 }
+
+// func Test_Punycode(t *testing.T) {
+
+// 	// 原始的中文域名
+// 	originalDomain := "北航_学院路校区_D201_gyc_hk2"
+
+// 	// Punycode 编码
+// 	punycode, err := idna.ToASCII(originalDomain)
+// 	if err != nil {
+// 		fmt.Println("Punycode encoding error:", err)
+// 		return
+// 	}
+
+// 	fmt.Println("Punycode:", punycode)
+
+// 	// 原始的中文域名
+// 	originalDomain = "fuyufan.viv.cn"
+
+// 	// Punycode 编码
+// 	punycode, err = idna.ToASCII(originalDomain)
+// 	if err != nil {
+// 		fmt.Println("Punycode encoding error:", err)
+// 		return
+// 	}
+
+// 	fmt.Println("Punycode:", punycode)
+
+// 	// Punycode 解码
+// 	decodedDomain, err := idna.ToUnicode(punycode)
+// 	if err != nil {
+// 		fmt.Println("Punycode decoding error:", err)
+// 		return
+// 	}
+
+// 	fmt.Println("Decoded domain:", decodedDomain)
+// }

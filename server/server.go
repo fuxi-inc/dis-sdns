@@ -130,6 +130,17 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 		}
 	}
 
+	// // TODO: 测试编码中文域名
+	// punycode, err := idna.ToASCII(r.Question[0].Name)
+	// if err != nil {
+	// 	log.Info("Punycode encoding error:", "name", r.Question[0].Name, "error", err.Error())
+	// 	return
+	// }
+
+	// fmt.Println("test-Punycode:", punycode)
+
+	// r.Question[0].Name = punycode
+
 	ch := s.chainPool.Get().(*middleware.Chain)
 
 	ch.Reset(w, r)
