@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/miekg/dns"
 	"github.com/semihalev/log"
@@ -59,18 +60,70 @@ func (f *Forwarder) ServeDNS(ctx context.Context, ch *middleware.Chain) {
 	fReq.CheckingDisabled = req.CheckingDisabled
 
 	for _, server := range f.servers {
-		resp, err := dns.Exchange(req, server)
-		// log.Info("req", req.String())
-		log.Info("get resp from the forwarder", "resp", resp.String())
 
-		if err != nil {
-			log.Warn("forwarder query failed", "query", formatQuestion(req.Question[0]), "error", err.Error())
+		// 230810临时方案：轮询查询，确保内容同步成功
+		// last := ""
+
+		start := time.Now()
+
+		flag := false
+
+		for {
+
+			log.Info("receive req query", "req", req.String())
+			resp, err := dns.Exchange(req, server)
+			// log.Info("req", req.String())
+			log.Info("get resp from the forwarder", "resp", resp.String())
+
+			q := req.Question[0]
+
+			if err != nil {
+				log.Warn("forwarder query failed", "query", formatQuestion(req.Question[0]), "error", err.Error())
+				flag = true
+				break
+			}
+
+			resp.Id = req.Id
+
+			if !req.Zero || q.Qtype != dns.TypeCERT {
+				_ = w.WriteMsg(resp)
+				break
+			}
+
+			// check if 10 seconds have passed
+			if time.Since(start).Seconds() > 10 {
+				_ = w.WriteMsg(resp)
+				break
+			}
+
+			if len(resp.Answer) != 0 {
+				_ = w.WriteMsg(resp)
+				break
+
+			}
+
+			// 没有查到内容，一直轮询
+			time.Sleep(time.Millisecond * 500)
+
+			log.Info("start round query")
+
+			// a := resp.Answer[0]
+
+			// tmp := strings.TrimPrefix(a.String(), a.Header().String())
+
+			// if last != "" && tmp != last {
+			// 	// 检测到内容更新
+			// 	_ = w.WriteMsg(resp)
+			// 	break
+			// }
+			// last = tmp
+
+		}
+
+		if flag {
 			continue
 		}
 
-		resp.Id = req.Id
-
-		_ = w.WriteMsg(resp)
 		return
 	}
 
