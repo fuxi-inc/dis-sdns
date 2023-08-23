@@ -8,3 +8,4 @@ blist_data
 access.log
 vendor
 .idea
+output/
