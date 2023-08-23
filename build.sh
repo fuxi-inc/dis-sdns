@@ -42,6 +42,7 @@ mkdir -p $output
 (
     cp ./control.sh $output
     mv ${module} ${output} &&        		 # 移动需要部署的文件到output目录下
+    cp -rf ./config $output &&
     echo -e "===== Generate output ok ====="
 ) || { echo -e "===== Generate output failure ====="; exit 2; } # 填充output目录失败后, 退出码为 非0
 

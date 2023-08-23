@@ -19,11 +19,11 @@ echo "hostname: $hostname\n"
 case ${action} in
     "start" )
       if [[ $hostname == "DISQtest" ]]; then
-          exec ./$app -c ./conf/dev
+          exec ./$app -config=./config/dev/sdns.conf
       elif [[ $hostname == "iZ9dpcnz15a4zgy578frvnZ" ]]; then
-          exec ./$app -c ./conf/pp
+          exec ./$app -config=./config/dev/sdns.conf
       else
-          exec ./$app -c ./conf/online
+          exec ./$app -config=./config/dev/sdns.online.conf
       fi
     ;;
     * )
