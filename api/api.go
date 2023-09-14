@@ -97,6 +97,20 @@ func (a *API) Run() {
 
 	r := gin.Default()
 	r.Use(cors.Default())
+	r.Use(func(c *gin.Context) {
+		host := c.Request.Header.Get("Origin")
+		c.Writer.Header().Set("Access-Control-Allow-Origin", host)
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		//c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization,X-LNG,apiVersion, shortVersion, deviceType,appVersion")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "*")
+		//c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "*")
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+		c.Next()
+	})
 
 	if debugpprof {
 		pprof.Register(r)
