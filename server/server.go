@@ -212,6 +212,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return mw.Msg()
 	}
 
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
 	var handlerFn func(http.ResponseWriter, *http.Request)
 
 	log.Info("URL Path", r.URL.Path)
