@@ -2,8 +2,10 @@ package forwarder
 
 import (
 	"context"
+	"math/rand"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/miekg/dns"
 	"github.com/semihalev/log"
@@ -57,20 +59,35 @@ func (f *Forwarder) ServeDNS(ctx context.Context, ch *middleware.Chain) {
 	fReq.RecursionDesired = true
 	fReq.CheckingDisabled = req.CheckingDisabled
 
-	for _, server := range f.servers {
-		resp, err := dns.Exchange(req, server)
-		// log.Info("req", req.String())
-		log.Info("get resp from the forwarder", "resp", resp.String())
+	// for _, server := range f.servers {
+	// 	resp, err := dns.Exchange(req, server)
+	// 	// log.Info("req", req.String())
+	// 	log.Info("get resp from the forwarder", "resp", resp.String())
 
-		if err != nil {
-			log.Warn("forwarder query failed", "query", formatQuestion(req.Question[0]), "error", err.Error())
-			continue
-		}
+	// 	if err != nil {
+	// 		log.Warn("forwarder query failed", "query", formatQuestion(req.Question[0]), "error", err.Error())
+	// 		continue
+	// 	}
 
+	// 	resp.Id = req.Id
+
+	// 	_ = w.WriteMsg(resp)
+	// 	return
+	// }
+
+	rand.Seed(time.Now().Unix())             // initialize global pseudo random generator
+	randomIndex := rand.Intn(len(f.servers)) // generate random index
+
+	resp, err := dns.Exchange(req, f.servers[randomIndex])
+
+	log.Info("get resp from the forwarder", "resp", resp.String())
+
+	if err != nil {
+		log.Warn("forwarder query failed", "query", formatQuestion(req.Question[0]), "error", err.Error())
+		ch.CancelWithRcode(dns.RcodeServerFailure, true)
+	} else {
 		resp.Id = req.Id
-
 		_ = w.WriteMsg(resp)
-		return
 	}
 
 	ch.CancelWithRcode(dns.RcodeServerFailure, true)
