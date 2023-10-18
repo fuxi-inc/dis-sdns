@@ -397,8 +397,6 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 				return
 			}
 
-			log.Info("receive query auth info", "doi", doi, "dudoi", dudoi)
-
 			// 对dudoi哈希
 			// TODO: 检查hash是否正确
 			hash := Hash([]byte(dudoi))
@@ -406,6 +404,8 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 			encodedString := base64.StdEncoding.EncodeToString(hash)
 
 			request := encodedString + "." + doi
+
+			log.Info("receive query auth info", "doi", doi, "dudoi", dudoi, "request", request)
 
 			qtype := dns.TypeTXT
 
