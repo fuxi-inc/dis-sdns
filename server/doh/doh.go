@@ -381,7 +381,12 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 					log.Info("failed to split the ownerID from the whole name", "answer", tmp)
 					return
 				}
-				result = result + tmp2[0] + ","
+				if i == l-1 {
+					result = result + tmp2[0]
+				} else {
+					result = result + tmp2[0] + ","
+				}
+
 			}
 			maps["owner"] = result
 		}
