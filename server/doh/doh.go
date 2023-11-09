@@ -349,35 +349,41 @@ func HandleDISQuery(handle func(*dns.Msg) *dns.Msg) func(http.ResponseWriter, *h
 				log.Info("failed to find the ownerID", "doi", doi)
 				return
 			}
-			a := msg.Answer[0]
 
-			tmp := strings.TrimPrefix(a.String(), a.Header().String())
-			slice := strings.Split(tmp, " ")
-			if len(slice) != 2 {
+			l := len(msg.Answer)
 
-				json, _ := json.Marshal(errmsg.ErrnoOwnerNotFoundError)
-				w.WriteHeader(http.StatusNotFound)
-				_, _ = w.Write(json)
+			result := ""
+			for i := 0; i < l; i++ {
 
-				log.Info("failed to split the ownerID from the answer RR", "answer", tmp)
-				return
+				a := msg.Answer[i]
+
+				tmp := strings.TrimPrefix(a.String(), a.Header().String())
+				slice := strings.Split(tmp, " ")
+				if len(slice) != 2 {
+
+					json, _ := json.Marshal(errmsg.ErrnoOwnerNotFoundError)
+					w.WriteHeader(http.StatusNotFound)
+					_, _ = w.Write(json)
+
+					log.Info("failed to split the ownerID from the answer RR", "answer", tmp)
+					return
+				}
+
+				tmp = strings.Trim(slice[0], "\"")
+
+				tmp2 := strings.Split(tmp, "data")
+				if len(tmp2) > 2 {
+					// 失败：无法从结果全名中截取到所有者ID
+					json, _ := json.Marshal(errmsg.ErrnoOwnerNotFoundError)
+					w.WriteHeader(http.StatusNotFound)
+					_, _ = w.Write(json)
+
+					log.Info("failed to split the ownerID from the whole name", "answer", tmp)
+					return
+				}
+				result = result + tmp2[0] + ""
 			}
-
-			tmp = strings.Trim(slice[0], "\"")
-
-			tmp2 := strings.Split(tmp, "data")
-			if len(tmp2) > 2 {
-				// 失败：无法从结果全名中截取到所有者ID
-				json, _ := json.Marshal(errmsg.ErrnoOwnerNotFoundError)
-				w.WriteHeader(http.StatusNotFound)
-				_, _ = w.Write(json)
-
-				log.Info("failed to split the ownerID from the whole name", "answer", tmp)
-				return
-			}
-
-			maps["owner"] = tmp2[0]
-
+			maps["owner"] = result
 		}
 
 		// 查询权属auth
