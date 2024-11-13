@@ -18,7 +18,7 @@ echo "hostname: $hostname\n"
 
 case ${action} in
     "start" )
-      if [[ $hostname == "DISQtest" ]]; then
+      if [[ $hostname == "fxzk-prd-node3" ]]; then
           exec ./$app -config=sdns.conf
       elif [[ $hostname == "iZ9dpcnz15a4zgy578frvnZ" ]]; then
           exec ./$app -config=sdns.conf
