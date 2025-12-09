@@ -22,9 +22,9 @@ case ${action} in
           exec ./$app -config=sdns.conf
       elif [[ $hostname == "iZ9dpcnz15a4zgy578frvnZ" ]]; then
           exec ./$app -config=sdns.conf
-      elif [[ $hostname == "test1" ]]; then
+      elif [[ $hostname == "test-1" ]]; then
           exec ./$app -config=wdo.conf
-      elif [[ $hostname == "prd-1" && $hostname == "prd-2"]]; then
+      elif [[ $hostname == "prd-1" && $hostname == "prd-2" ]]; then
           exec ./$app -config=wdo.online.conf
       else
           exec ./$app -config=sdns.online.conf
